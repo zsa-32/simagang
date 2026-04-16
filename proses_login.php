@@ -1,70 +1,63 @@
 <?php
-// Panggil file koneksi database
 require_once 'config/db_connect.php';
 
-// Pastikan form di-submit menggunakan metode POST
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    
-    // Tangkap inputan dari form, gunakan trim() untuk menghapus spasi berlebih
-    $username = trim($_POST['username']);
+    // Di index.php, ganti name="username" menjadi name="email" agar sesuai DB
+    $email = trim($_POST['email']); 
     $password = trim($_POST['password']);
 
-    // Cek apakah username dan password tidak kosong
-    if (empty($username) || empty($password)) {
-        // Jika kosong, kembalikan ke halaman login dengan pesan error
+    if (empty($email) || empty($password)) {
         header("Location: index.php?error=empty");
         exit();
     }
 
     try {
-        // Siapkan query menggunakan Prepared Statement PDO (Mencegah SQL Injection)
-        $stmt = $conn->prepare("SELECT * FROM users WHERE username = :username LIMIT 1");
-        $stmt->bindParam(':username', $username);
+        // Query Join untuk mengambil data User sekaligus Nama Role-nya
+        $query = "SELECT u.*, r.nama_role 
+                  FROM Users u
+                  JOIN Users_role ur ON u.id_user = ur.id_user
+                  JOIN Roles r ON ur.id_role = r.id_role
+                  WHERE u.email = :email LIMIT 1";
+        
+        $stmt = $conn->prepare($query);
+        $stmt->bindParam(':email', $email);
         $stmt->execute();
-
-        // Ambil data user
         $user = $stmt->fetch();
 
-        // Cek apakah user ditemukan
         if ($user) {
-            // Cek password (karena data dummy kita pakai teks biasa, kita pakai == dulu)
-            // Catatan: Jika nanti pakai password_hash(), ganti baris ini menjadi:
-            // if (password_verify($password, $user['password'])) {
+            // Cek password (masih teks biasa sesuai data dummy sebelumnya)
             if ($password == $user['password']) {
                 
-                // Password benar, simpan data ke Session
-                $_SESSION['id_user'] = $user['id_user'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['role'] = $user['role'];
+                $_SESSION['id_user']   = $user['id_user'];
+                $_SESSION['nama']      = $user['nama'];
+                $_SESSION['email']     = $user['email'];
+                $_SESSION['role_name'] = $user['nama_role']; // Menyimpan nama role
 
-                // Arahkan ke folder/dashboard sesuai role masing-masing
-                if ($user['role'] == 'admin') {
+                // Pengalihan halaman berdasarkan NAMA ROLE di database
+                $role = strtolower($user['nama_role']);
+                
+                if ($role == 'admin') {
                     header("Location: admin/dashboard.php");
-                } elseif ($user['role'] == 'dosen') {
+                } elseif ($role == 'dosen pembimbing' || $role == 'pembimbing lapang') {
                     header("Location: dosen/dashboard.php");
-                } elseif ($user['role'] == 'mahasiswa') {
+                } elseif ($role == 'mahasiswa') {
                     header("Location: mahasiswa/dashboard.php");
                 }
                 exit();
                 
             } else {
-                // Password salah
                 header("Location: index.php?error=wrongpassword");
                 exit();
             }
         } else {
-            // Username tidak ditemukan
             header("Location: index.php?error=usernotfound");
             exit();
         }
 
     } catch(PDOException $e) {
-        // Jika terjadi error pada database
         die("Error: " . $e->getMessage());
     }
 } else {
-    // Jika ada yang mencoba akses file ini lewat URL secara langsung
     header("Location: index.php");
     exit();
 }
-?>
