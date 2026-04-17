@@ -76,6 +76,9 @@ $activePage = 'manajemen_user';
                             <button id="filterDosen" onclick="setFilter('dosen')"
                                 class="filter-btn px-4 py-2.5 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-100 transition-all">Dosen
                                 Pembimbing</button>
+                            <button id="filterpembimbing" onclick="setFilter('pembimbing')"
+                                class="filter-btn px-4 py-2.5 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-100 transition-all">
+                                Pembimbing Lapang</button>
                         </div>
                     </div>
 
@@ -146,7 +149,8 @@ $activePage = 'manajemen_user';
                                             <div class="flex items-center gap-2">
                                                 <button
                                                     class="w-8 h-8 rounded-lg border border-blue-200 text-blue-500 hover:bg-blue-50 transition-colors flex items-center justify-center"
-                                                    title="Edit">
+                                                    title="Edit"
+                                                    onclick="openEditModal('<?= htmlspecialchars($u['nama']) ?>', '<?= htmlspecialchars($u['email']) ?>', '<?= htmlspecialchars($u['role']) ?>', '<?= htmlspecialchars($u['id']) ?>')">
                                                     <i class="fas fa-pen text-[12px]"></i>
                                                 </button>
                                                 <button
@@ -194,49 +198,119 @@ $activePage = 'manajemen_user';
                     <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
-            <form class="space-y-4">
+            <form action="proses_buat_akun.php" method="POST" class="space-y-4">
+    
+    <div>
+        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Nama Lengkap</label>
+        <input type="text" name="nama" placeholder="Masukkan nama lengkap" required
+            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
+    </div>
+
+    <div class="mb-4">
+        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Email</label>
+        <input type="email" name="email" placeholder="contoh@polije.ac.id" required
+            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+        <div class="mb-4">
+            <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Role</label>
+            <select name="role" required
+                class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-white">
+                <option value="">Pilih role...</option>
+                <option value="mahasiswa">Mahasiswa</option>
+                <option value="dosen">Dosen Pembimbing</option>
+                <option value="pembimbing">Pembimbing Lapang</option>
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-[13px] font-medium text-gray-700 mb-1.5">NIM/NIP</label>
+            <input type="text" name="nomor_induk" placeholder="Masukan NIM/NIP" required
+                class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
+        </div>
+    </div>
+
+    <div>
+    <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Password</label>
+    <div class="relative">
+        <input type="password" id="passwordInput" name="password" placeholder="Minimal 8 karakter" required
+            class="w-full pl-4 pr-10 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
+        
+        <span id="togglePasswordAkun" class="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400 hover:text-gray-600 transition-colors">
+            <i class="fas fa-eye-slash" id="eyeIconAkun"></i>
+        </span>
+    </div>
+</div>
+
+    <div class="flex items-center gap-3 pt-2">
+        <button type="button" onclick="closeModal()"
+            class="flex-1 py-2.5 border border-gray-200 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors">Batal</button>
+        <button type="submit"
+            class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-700 transition-colors">Simpan
+            Akun</button>
+    </div>
+</form>
+        </div>
+    </div>
+
+    <!-- Modal Edit User -->
+    <div id="modalEditUser" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+            <!-- Header -->
+            <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-bold text-gray-900">Edit User</h3>
+                <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            <!-- Form -->
+            <form action="proses_edit_user.php" method="POST" class="px-6 py-5 space-y-4">
+                <input type="hidden" name="id_user" id="editUserId">
+
                 <div>
                     <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Nama Lengkap</label>
-                    <input type="text" placeholder="Masukkan nama lengkap"
-                        class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
-                </div>
-                <div>
-
-                    <div class="mb-4">
-                        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Email</label>
-                        <input type="email" placeholder="contoh@polije.ac.id"
-                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="mb-4">
-                            <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Role</label>
-                            <select
-                                class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-white">
-                                <option value="">Pilih role...</option>
-                                <option value="mahasiswa">Mahasiswa</option>
-                                <option value="dosen">Dosen Pembimbing</option>
-                            </select>
-                        </div>
-
-                        <div class="mb-4">
-                            <label class="block text-[13px] font-medium text-gray-700 mb-1.5">NIM/NIP</label>
-                            <input type="text" placeholder="Masukan NIM/NIP"
-                                class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
-                        </div>
-                    </div>
+                    <input type="text" name="nama" id="editNama" placeholder="Nama lengkap" required
+                        class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-gray-50">
                 </div>
 
                 <div>
-                    <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Password</label>
-                    <input type="password" placeholder="Minimal 8 karakter"
-                        class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
+                    <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Email</label>
+                    <input type="email" name="email" id="editEmail" placeholder="contoh@polije.ac.id" required
+                        class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-gray-50">
                 </div>
-                <div class="flex items-center gap-3 pt-2">
-                    <button type="button" onclick="closeModal()"
-                        class="flex-1 py-2.5 border border-gray-200 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors">Batal</button>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Role</label>
+                        <select name="role" id="editRole" required
+                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-gray-50">
+                            <option value="">Pilih role...</option>
+                            <option value="Mahasiswa">Mahasiswa</option>
+                            <option value="Dosen Pembimbing">Dosen Pembimbing</option>
+                            <option value="Pembimbing Lapang">Pembimbing Lapang</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">NIM / NIP</label>
+                        <input type="text" name="nomor_induk" id="editNomorInduk" placeholder="NIM / NIP"
+                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-gray-50">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Ganti Password</label>
+                    <input type="password" name="password" id="editPassword"
+                        placeholder="Kosongkan jika tidak ingin mengubah"
+                        class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-gray-50">
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center justify-end gap-3 pt-2">
+                    <button type="button" onclick="closeEditModal()"
+                        class="px-5 py-2.5 border border-gray-200 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors">Batal</button>
                     <button type="submit"
-                        class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-700 transition-colors">Simpan
-                        Akun</button>
+                        class="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-700 transition-colors">Simpan Perubahan</button>
                 </div>
             </form>
         </div>
@@ -257,7 +331,7 @@ $activePage = 'manajemen_user';
 
         function setFilter(filter) {
             currentFilter = filter;
-            const btns = { 'semua': 'filterAll', 'mahasiswa': 'filterMhs', 'dosen': 'filterDosen' };
+            const btns = { 'semua': 'filterAll', 'mahasiswa': 'filterMhs', 'dosen': 'filterDosen','pembimbing':'filterpembimbing' };
             Object.values(btns).forEach(id => {
                 document.getElementById(id).className = 'filter-btn px-4 py-2.5 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-100 transition-all';
             });
@@ -275,9 +349,56 @@ $activePage = 'manajemen_user';
             });
         }
 
+        // ===== Edit User Modal =====
+        function openEditModal(nama, email, role, nomorInduk) {
+            document.getElementById('editNama').value = nama;
+            document.getElementById('editEmail').value = email;
+            document.getElementById('editNomorInduk').value = nomorInduk;
+            document.getElementById('editPassword').value = '';
+
+            // Set selected role
+            const selectRole = document.getElementById('editRole');
+            for (let i = 0; i < selectRole.options.length; i++) {
+                if (selectRole.options[i].value === role) {
+                    selectRole.selectedIndex = i;
+                    break;
+                }
+            }
+
+            const modal = document.getElementById('modalEditUser');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeEditModal() {
+            const modal = document.getElementById('modalEditUser');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // Toggle password visibility
+        document.getElementById('togglePasswordAkun').addEventListener('click', function () {
+            const passwordInput = document.getElementById('passwordInput');
+            const eyeIcon = document.getElementById('eyeIconAkun');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.classList.remove('fa-eye-slash');
+                eyeIcon.classList.add('fa-eye');
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.classList.remove('fa-eye');
+                eyeIcon.classList.add('fa-eye-slash');
+            }
+        });
+
         // Close modal on backdrop click
         document.getElementById('modalBuatAkun').addEventListener('click', function (e) {
             if (e.target === this) closeModal();
+        });
+
+        document.getElementById('modalEditUser').addEventListener('click', function (e) {
+            if (e.target === this) closeEditModal();
         });
     </script>
 </body>

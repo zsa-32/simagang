@@ -7,7 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
 $host = "localhost";
 $db   = "simagang"; // Nama database Anda
 $user = "root";      // Default XAMPP adalah root
-$pass = "root";          
+$pass = "";          
 
 try {
     // Membuat koneksi dengan PDO

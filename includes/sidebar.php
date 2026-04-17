@@ -26,7 +26,12 @@ $menus = [
         ['title' => 'Lihat Jurnal',        'icon' => 'fa-file-alt',      'url' => 'jurnal.php',       'id' => 'lihat_jurnal'],
         ['title' => 'Presensi',            'icon' => 'fa-user-check',    'url' => 'presensi_mhs.php', 'id' => 'presensi'],
         ['title' => 'Penilaian',           'icon' => 'fa-clipboard-list','url' => 'penilaian.php',    'id' => 'penilaian'],
-    ]
+    ],
+    'pembimbing' => [
+        ['title' => 'Dashboard',             'icon' => 'fa-th-large',      'url' => 'dashboard.php',              'id' => 'dashboard',             'group' => 'MENU UTAMA'],
+        ['title' => 'Monitoring Mahasiswa',  'icon' => 'fa-user-graduate', 'url' => 'monitoring_mahasiswa.php',   'id' => 'monitoring_mahasiswa',  'group' => 'MENU UTAMA'],
+        ['title' => 'Pengaturan Sistem',     'icon' => 'fa-cog',           'url' => 'pengaturan.php',             'id' => 'pengaturan',            'group' => 'PENGATURAN'],
+    ],
 ];
 
 $currentMenu = $menus[$role] ?? [];
@@ -49,7 +54,7 @@ $currentMenu = $menus[$role] ?? [];
 
     <!-- Navigation Menu -->
     <div class="flex-1 overflow-y-auto py-5 px-4 h-full">
-        <?php if ($role === 'admin'): ?>
+        <?php if ($role === 'admin' || $role === 'pembimbing'): ?>
             <?php
                 $groups = [];
                 foreach ($currentMenu as $menu) {

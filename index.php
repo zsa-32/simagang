@@ -33,7 +33,7 @@
                 <img src="assets/img/login1.png" alt="Ilustrasi Magang" class="img-fluid mb-4" style="max-width: 65%;">
                 <h2 class="fw-bold text-primary text-center" style="color: #1a65ff !important;">Selamat Datang di<br>Magang TIF</h2>
                 <p class="text-center text-muted mt-3 px-4" style="font-size: 0.95rem; max-width: 500px;">
-                    Langkah awalmu menuju dunia profesional dimulai di sini.
+                    Langkah awalmu menuju dunia profesional dimulai di sini. Kelola aktivitas magang, pantau progres, dan raih pengalaman industri terbaikmu.
                 </p>
             </div>
 
