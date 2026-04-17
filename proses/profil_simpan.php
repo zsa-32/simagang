@@ -25,6 +25,11 @@ $alamat   = trim($_POST['alamat']   ?? '');
 $prodi    = trim($_POST['prodi']    ?? '');
 $semester = (int) ($_POST['semester'] ?? 0);
 
+// Field khusus mahasiswa (penempatan magang)
+$nama_perusahaan  = trim($_POST['nama_perusahaan']  ?? '');
+$posisi_magang    = trim($_POST['posisi_magang']    ?? '');
+$dosen_pembimbing = trim($_POST['dosen_pembimbing'] ?? '');
+
 // Tentukan redirect balik sesuai role
 $back = match($role) {
     'mahasiswa'        => '../mahasiswa/profil.php',
@@ -88,10 +93,20 @@ try {
     if ($existing) {
         $sql = "UPDATE Profile SET no_hp = :no_hp, alamat = :alamat, prodi = :prodi, semester = :semester";
         if ($foto_path) $sql .= ", foto = :foto";
+        // Kolom khusus mahasiswa
+        if ($role === 'mahasiswa') {
+            $sql .= ", nama_perusahaan = :nama_perusahaan, posisi_magang = :posisi_magang, dosen_pembimbing = :dosen_pembimbing";
+        }
         $sql .= " WHERE id_user = :id_user";
     } else {
-        $sql = "INSERT INTO Profile (id_user, no_hp, alamat, prodi, semester" . ($foto_path ? ", foto" : "") . ")
-                VALUES (:id_user, :no_hp, :alamat, :prodi, :semester" . ($foto_path ? ", :foto" : "") . ")";
+        $extraCols = $foto_path ? ", foto" : "";
+        $extraVals = $foto_path ? ", :foto" : "";
+        if ($role === 'mahasiswa') {
+            $extraCols .= ", nama_perusahaan, posisi_magang, dosen_pembimbing";
+            $extraVals .= ", :nama_perusahaan, :posisi_magang, :dosen_pembimbing";
+        }
+        $sql = "INSERT INTO Profile (id_user, no_hp, alamat, prodi, semester$extraCols)
+                VALUES (:id_user, :no_hp, :alamat, :prodi, :semester$extraVals)";
     }
 
     $params = [
@@ -102,6 +117,11 @@ try {
         ':semester' => $semester ?: null,
     ];
     if ($foto_path) $params[':foto'] = $foto_path;
+    if ($role === 'mahasiswa') {
+        $params[':nama_perusahaan']  = $nama_perusahaan  ?: null;
+        $params[':posisi_magang']    = $posisi_magang    ?: null;
+        $params[':dosen_pembimbing'] = $dosen_pembimbing ?: null;
+    }
 
     $conn->prepare($sql)->execute($params);
 

@@ -16,6 +16,8 @@
             u.nama, u.email,
             p.nim, p.no_hp, p.alamat, p.prodi, p.semester,
             p.dosen_pembimbing, p.foto,
+            p.nama_perusahaan AS profil_nama_perusahaan,
+            p.posisi_magang,
             c.nama_company,
             ip.tanggal_mulai, ip.tanggal_selesai,
             ub.nama AS nama_pembimbing
@@ -30,6 +32,11 @@
     $stmt->execute([':id' => $id_user]);
     $data = $stmt->fetch() ?: [];
 
+    // Nama perusahaan: prioritaskan yang di Profile (self-reported), fallback ke relasi Company
+    $namaPerusahaan = !empty($data['profil_nama_perusahaan'])
+        ? $data['profil_nama_perusahaan']
+        : ($data['nama_company'] ?? '-');
+
     // Fungsi helper agar tidak error jika kolom kosong
     $get = fn($key, $default = '-') => !empty($data[$key]) ? $data[$key] : $default;
 
@@ -43,8 +50,8 @@
     $tglSelesai = !empty($data['tanggal_selesai']) ? date('d M Y', strtotime($data['tanggal_selesai'])) : '-';
     $periodeStr = ($tglMulai !== '-') ? "$tglMulai – $tglSelesai" : '-';
 
-    // Nama pembimbing lapang (dari profil atau relasi)
-    $namaPembimbing = $get('nama_pembimbing') !== '-' ? $data['nama_pembimbing'] : $get('dosen_pembimbing');
+    // Nama dosen/pembimbing (dari relasi Users, fallback ke teks di Profile)
+    $namaPembimbing = !empty($data['nama_pembimbing']) ? $data['nama_pembimbing'] : ($data['dosen_pembimbing'] ?? '-');
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -206,14 +213,25 @@
                             <i class="fas fa-building text-[#3b66f5] text-[16px]"></i>
                             <h3 class="text-[16px] font-bold text-gray-800">Informasi Penempatan Magang</h3>
                         </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                        <!-- View Mode Penempatan -->
+                        <div id="viewModePenempatan" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div class="info-card bg-blue-50 rounded-xl p-4 flex items-start gap-3">
                                 <div class="w-9 h-9 rounded-lg bg-[#3b66f5] flex items-center justify-center shrink-0 mt-0.5">
                                     <i class="fas fa-building text-white text-[13px]"></i>
                                 </div>
                                 <div>
                                     <p class="text-[11px] font-semibold text-blue-400 mb-1">Nama Perusahaan/Instansi</p>
-                                    <p class="text-[14px] font-semibold text-gray-800"><?= htmlspecialchars($get('nama_company', 'Belum ditetapkan')) ?></p>
+                                    <p class="text-[14px] font-semibold text-gray-800"><?= htmlspecialchars($namaPerusahaan !== '-' ? $namaPerusahaan : 'Belum ditetapkan') ?></p>
+                                </div>
+                            </div>
+                            <div class="info-card bg-blue-50 rounded-xl p-4 flex items-start gap-3">
+                                <div class="w-9 h-9 rounded-lg bg-[#3b66f5] flex items-center justify-center shrink-0 mt-0.5">
+                                    <i class="fas fa-briefcase text-white text-[13px]"></i>
+                                </div>
+                                <div>
+                                    <p class="text-[11px] font-semibold text-blue-400 mb-1">Posisi / Divisi Magang</p>
+                                    <p class="text-[14px] font-semibold text-gray-800"><?= htmlspecialchars($get('posisi_magang', 'Belum diisi')) ?></p>
                                 </div>
                             </div>
                             <div class="info-card bg-blue-50 rounded-xl p-4 flex items-start gap-3">
@@ -225,14 +243,48 @@
                                     <p class="text-[14px] font-semibold text-gray-800"><?= htmlspecialchars($periodeStr) ?></p>
                                 </div>
                             </div>
-                            <div class="info-card bg-blue-50 rounded-xl p-4 flex items-start gap-3 sm:col-span-2">
+                            <div class="info-card bg-blue-50 rounded-xl p-4 flex items-start gap-3">
                                 <div class="w-9 h-9 rounded-lg bg-[#3b66f5] flex items-center justify-center shrink-0 mt-0.5">
                                     <i class="fas fa-user-tie text-white text-[13px]"></i>
                                 </div>
                                 <div>
                                     <p class="text-[11px] font-semibold text-blue-400 mb-1">Dosen / Pembimbing Lapang</p>
-                                    <p class="text-[14px] font-semibold text-gray-800"><?= htmlspecialchars($namaPembimbing) ?></p>
+                                    <p class="text-[14px] font-semibold text-gray-800"><?= htmlspecialchars($namaPembimbing ?: 'Belum ditetapkan') ?></p>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Edit Mode Penempatan -->
+                        <div id="editModePenempatan" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[12px] font-semibold text-gray-500 mb-1.5">Nama Perusahaan / Instansi</label>
+                                <input type="text" name="nama_perusahaan"
+                                    value="<?= htmlspecialchars($namaPerusahaan !== '-' ? $namaPerusahaan : '') ?>"
+                                    placeholder="Contoh: PT. Inovasi Digital"
+                                    class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-[14px] text-gray-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-[12px] font-semibold text-gray-500 mb-1.5">Posisi / Divisi Magang</label>
+                                <input type="text" name="posisi_magang"
+                                    value="<?= htmlspecialchars($get('posisi_magang', '')) ?>"
+                                    placeholder="Contoh: Backend Developer"
+                                    class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-[14px] text-gray-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-[12px] font-semibold text-gray-500 mb-1.5">
+                                    Periode Magang
+                                    <span class="text-gray-400 font-normal">(diatur oleh admin)</span>
+                                </label>
+                                <input type="text" disabled
+                                    value="<?= htmlspecialchars($periodeStr) ?>"
+                                    class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-[14px] text-gray-400 bg-gray-50 cursor-not-allowed outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[12px] font-semibold text-gray-500 mb-1.5">Dosen / Pembimbing Lapang</label>
+                                <input type="text" name="dosen_pembimbing"
+                                    value="<?= htmlspecialchars($namaPembimbing ?: '') ?>"
+                                    placeholder="Nama dosen pembimbing"
+                                    class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-[14px] text-gray-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
                             </div>
                         </div>
                     </div>
@@ -263,6 +315,8 @@
         function toggleEdit() {
             document.getElementById('viewMode').classList.add('hidden');
             document.getElementById('editMode').classList.remove('hidden');
+            document.getElementById('viewModePenempatan').classList.add('hidden');
+            document.getElementById('editModePenempatan').classList.remove('hidden');
             document.getElementById('editBtn').classList.add('hidden');
             document.getElementById('selesaiBtn').classList.add('hidden');
             document.getElementById('cancelBtn').classList.remove('hidden');
@@ -273,6 +327,8 @@
         function cancelEdit() {
             document.getElementById('viewMode').classList.remove('hidden');
             document.getElementById('editMode').classList.add('hidden');
+            document.getElementById('viewModePenempatan').classList.remove('hidden');
+            document.getElementById('editModePenempatan').classList.add('hidden');
             document.getElementById('editBtn').classList.remove('hidden');
             document.getElementById('selesaiBtn').classList.remove('hidden');
             document.getElementById('cancelBtn').classList.add('hidden');
@@ -289,8 +345,7 @@
                     document.getElementById('avatarImg').src = e.target.result;
                 };
                 reader.readAsDataURL(file);
-            }hadow-blue-200');
-            }, 1200);
+            }
         }
     </script>
 </body>

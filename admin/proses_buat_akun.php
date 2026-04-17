@@ -75,20 +75,18 @@ try {
     );
     $stmtRole->execute([':id_user' => $newId, ':id_role' => $id_role]);
 
-    // 5. Insert ke Profile (NIM atau NIP tergantung role)
-    if (!empty($nomor_induk)) {
-        $nim = ($id_role === 4) ? $nomor_induk : null;   // Mahasiswa
-        $nip = ($id_role !== 4) ? $nomor_induk : null;   // Non-mahasiswa
+    // 5. Insert ke Profile — selalu buat row Profile agar user bisa edit profil
+    $nim = ($id_role === 4 && !empty($nomor_induk)) ? $nomor_induk : null;   // Mahasiswa
+    $nip = ($id_role !== 4 && !empty($nomor_induk)) ? $nomor_induk : null;   // Non-mahasiswa
 
-        $stmtProfile = $conn->prepare(
-            "INSERT INTO Profile (id_user, nim, nip) VALUES (:id_user, :nim, :nip)"
-        );
-        $stmtProfile->execute([
-            ':id_user' => $newId,
-            ':nim'     => $nim,
-            ':nip'     => $nip,
-        ]);
-    }
+    $stmtProfile = $conn->prepare(
+        "INSERT INTO Profile (id_user, nim, nip) VALUES (:id_user, :nim, :nip)"
+    );
+    $stmtProfile->execute([
+        ':id_user' => $newId,
+        ':nim'     => $nim,
+        ':nip'     => $nip,
+    ]);
 
     header('Location: manajemen_user.php?success=akun_dibuat');
     exit();

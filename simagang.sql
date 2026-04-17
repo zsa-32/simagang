@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Apr 17, 2026 at 10:23 AM
+-- Generation Time: Apr 17, 2026 at 02:16 PM
 -- Server version: 8.0.30
 -- PHP Version: 8.1.10
 
@@ -195,7 +195,10 @@ CREATE TABLE `profile` (
 INSERT INTO `profile` (`id_profile`, `id_user`, `nip`, `nim`, `no_hp`, `alamat`, `prodi`, `semester`, `nama_perusahaan`, `dosen_pembimbing`, `id_dosen_pembimbing`, `foto`, `posisi_magang`) VALUES
 (1, 4, NULL, '21000123', '081234567890', 'Jl. Teknik No. 5, Surabaya', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (2, NULL, '12345678', NULL, '0987654321', 'jalan karimata', NULL, NULL, NULL, NULL, 1, NULL, NULL),
-(3, 2, '19850101', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(3, 2, '19850101', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(4, 5, NULL, 'E41251539', NULL, NULL, 'Teknik informatika', 7, NULL, NULL, NULL, NULL, NULL),
+(5, 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(6, 3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -265,7 +268,8 @@ INSERT INTO `users` (`id_user`, `nama`, `email`, `password`) VALUES
 (1, 'Sistem Admin', 'admin@simagang.com', 'admin123'),
 (2, 'Dr. Aris Sudarsono', 'aris@univ.ac.id', 'dosen123'),
 (3, 'Bapak Eko Tech', 'eko@company.com', 'lapang123'),
-(4, 'Rizky Pratama', 'rizky@student.com', 'mhs123');
+(4, 'Rizky Pratama', 'rizky@student.com', 'mhs123'),
+(5, 'zal', 'E41251539@student.polije.ac.id', '$2y$10$wWHavpjej091G19cdh/Df.zS/H69QXIZ6dcJaSi60CXT9J.02K8vy');
 
 -- --------------------------------------------------------
 
@@ -287,7 +291,8 @@ INSERT INTO `users_role` (`id_user_role`, `id_user`, `id_role`) VALUES
 (1, 1, 1),
 (2, 2, 2),
 (3, 3, 3),
-(4, 4, 4);
+(4, 4, 4),
+(5, 5, 4);
 
 --
 -- Indexes for dumped tables
@@ -422,7 +427,7 @@ ALTER TABLE `internship_placement`
 -- AUTO_INCREMENT for table `profile`
 --
 ALTER TABLE `profile`
-  MODIFY `id_profile` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id_profile` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `reports`
@@ -446,13 +451,13 @@ ALTER TABLE `roles_permissions`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id_user` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id_user` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `users_role`
 --
 ALTER TABLE `users_role`
-  MODIFY `id_user_role` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id_user_role` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- Constraints for dumped tables
