@@ -56,7 +56,7 @@
         'Izin'   => ['icon'=>'fa-clock',           'class'=>'text-orange-500 bg-orange-50', 'text'=>'Izin'],
         'Sakit'  => ['icon'=>'fa-clock',           'class'=>'text-orange-500 bg-orange-50', 'text'=>'Sakit'],
         'Alpha'  => ['icon'=>'fa-times-circle',    'class'=>'text-red-500 bg-red-50',       'text'=>'Tidak Hadir'],
-        null     => ['icon'=>'fa-question-circle', 'class'=>'text-gray-400 bg-gray-50',     'text'=>'Belum Absen'],
+        ''       => ['icon'=>'fa-question-circle', 'class'=>'text-gray-400 bg-gray-50',     'text'=>'Belum Absen'],
     ];
 ?>
 <!DOCTYPE html>
@@ -197,8 +197,8 @@
                                     </tr>
                                 <?php else: ?>
                                 <?php foreach ($presences as $p):
-                                    $ket = $p['keterangan'] ?? null;
-                                    $cfg = $statusConfig[$ket] ?? $statusConfig[null];
+                                    $ket = $p['keterangan'] ?? '';
+                                    $cfg = $statusConfig[$ket] ?? $statusConfig[''];
                                 ?>
                                 <tr class="presence-row transition-colors" data-search="<?= strtolower($p['nama'] . ' ' . $p['nim']) ?>">
                                     <td class="px-6 py-4">
