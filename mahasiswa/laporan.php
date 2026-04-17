@@ -1,7 +1,24 @@
 <?php
     session_start();
+    require_once '../config/db_connect.php';
+
+    if (!isset($_SESSION['id_user']) || strtolower($_SESSION['role_name']) !== 'mahasiswa') {
+        header('Location: ../index.php'); exit();
+    }
+
     $role = 'mahasiswa';
     $activePage = 'laporan';
+    $id_user = (int) $_SESSION['id_user'];
+
+    // Ambil riwayat laporan
+    $stmt = $conn->prepare("
+        SELECT id_report, jenis_laporan, file, tanggal_upload
+        FROM Reports
+        WHERE id_user = :id
+        ORDER BY tanggal_upload DESC
+    ");
+    $stmt->execute([':id' => $id_user]);
+    $laporanList = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -62,58 +79,74 @@
                     <div class="absolute right-0 top-0 w-80 h-full bg-gradient-to-l from-[#254bdb] to-transparent z-0 opacity-80"></div>
                 </div>
 
+                <!-- Notifikasi -->
+                <?php if (isset($_GET['success'])): ?>
+                    <div id="notifBox" class="flex items-center gap-3 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-[13px] font-medium">
+                        <i class="fas fa-check-circle text-green-500"></i> Laporan berhasil diupload.
+                        <button onclick="document.getElementById('notifBox').remove()" class="ml-auto text-green-400 hover:text-green-600"><i class="fas fa-times"></i></button>
+                    </div>
+                <?php elseif (isset($_GET['error'])): ?>
+                    <?php $errMap = ['no_file'=>'Pilih file terlebih dahulu.','file_besar'=>'Ukuran file melebihi 10MB.','file_format'=>'Format tidak didukung (PDF/DOC/DOCX).','upload_gagal'=>'Upload gagal.','db_error'=>'Kesalahan database.']; ?>
+                    <div class="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-[13px] font-medium">
+                        <i class="fas fa-exclamation-circle text-red-500"></i> <?= htmlspecialchars($errMap[$_GET['error']] ?? 'Terjadi kesalahan.') ?>
+                    </div>
+                <?php endif; ?>
+
                 <!-- Upload Section -->
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
                     <h3 class="text-[17px] font-bold text-gray-800 mb-5">Upload Laporan Akhir</h3>
 
-                    <!-- Dropzone Area -->
-                    <div id="dropzone"
-                         class="dropzone border-2 border-dashed border-gray-300 rounded-xl p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-blue-50/40 hover:border-blue-400 transition-all"
-                         onclick="document.getElementById('fileInput').click()"
-                         ondragover="handleDragOver(event)"
-                         ondragleave="handleDragLeave(event)"
-                         ondrop="handleDrop(event)">
+                    <form action="../proses/laporan_upload.php" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="jenis_laporan" value="Laporan Akhir PKL">
 
-                        <div class="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                            <i class="fas fa-cloud-upload-alt text-[22px] text-blue-500"></i>
-                        </div>
-                        <p class="text-[15px] font-medium text-gray-700 mb-1">Drag & drop file laporan Anda di sini</p>
-                        <p class="text-[13px] text-gray-400 mb-5">atau klik untuk memilih file</p>
+                        <!-- Dropzone Area -->
+                        <div id="dropzone"
+                             class="dropzone border-2 border-dashed border-gray-300 rounded-xl p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-blue-50/40 hover:border-blue-400 transition-all"
+                             onclick="document.getElementById('fileInput').click()"
+                             ondragover="handleDragOver(event)"
+                             ondragleave="handleDragLeave(event)"
+                             ondrop="handleDrop(event)">
 
-                        <button type="button"
-                                class="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-6 py-2.5 rounded-lg font-medium text-[14px] transition-colors shadow-sm">
-                            Pilih File
-                        </button>
-
-                        <p class="text-[12px] text-gray-400 mt-4">Format yang didukung: PDF, DOC, DOCX (Max: 10MB)</p>
-
-                        <!-- Hidden file input -->
-                        <input type="file" id="fileInput" class="hidden" accept=".pdf,.doc,.docx" onchange="handleFileSelect(event)">
-                    </div>
-
-                    <!-- File selected indicator (hidden by default) -->
-                    <div id="fileSelected" class="hidden mt-4 p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-file-pdf text-red-500 text-[16px]"></i>
+                            <div class="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                                <i class="fas fa-cloud-upload-alt text-[22px] text-blue-500"></i>
                             </div>
-                            <div>
-                                <p id="fileName" class="text-[14px] font-medium text-gray-800">-</p>
-                                <p id="fileSize" class="text-[12px] text-gray-400">-</p>
-                            </div>
-                        </div>
-                        <button onclick="clearFile()" class="text-gray-400 hover:text-red-500 transition-colors">
-                            <i class="fas fa-times text-[16px]"></i>
-                        </button>
-                    </div>
+                            <p class="text-[15px] font-medium text-gray-700 mb-1">Drag &amp; drop file laporan Anda di sini</p>
+                            <p class="text-[13px] text-gray-400 mb-5">atau klik untuk memilih file</p>
 
-                    <!-- Upload Button -->
-                    <div class="mt-5 flex justify-end">
-                        <button type="button"
-                                class="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-6 py-2.5 rounded-lg font-medium text-[14px] transition-colors shadow-sm flex items-center gap-2">
-                            <i class="fas fa-upload text-[13px]"></i> Upload Laporan
-                        </button>
-                    </div>
+                            <button type="button"
+                                    class="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-6 py-2.5 rounded-lg font-medium text-[14px] transition-colors shadow-sm">
+                                Pilih File
+                            </button>
+
+                            <p class="text-[12px] text-gray-400 mt-4">Format yang didukung: PDF, DOC, DOCX (Max: 10MB)</p>
+
+                            <input type="file" id="fileInput" name="file_laporan" class="hidden" accept=".pdf,.doc,.docx" onchange="handleFileSelect(event)">
+                        </div>
+
+                        <!-- File selected indicator -->
+                        <div id="fileSelected" class="hidden mt-4 p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-file-pdf text-red-500 text-[16px]"></i>
+                                </div>
+                                <div>
+                                    <p id="fileName" class="text-[14px] font-medium text-gray-800">-</p>
+                                    <p id="fileSize" class="text-[12px] text-gray-400">-</p>
+                                </div>
+                            </div>
+                            <button type="button" onclick="clearFile()" class="text-gray-400 hover:text-red-500 transition-colors">
+                                <i class="fas fa-times text-[16px]"></i>
+                            </button>
+                        </div>
+
+                        <!-- Upload Button -->
+                        <div class="mt-5 flex justify-end">
+                            <button type="submit"
+                                    class="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-6 py-2.5 rounded-lg font-medium text-[14px] transition-colors shadow-sm flex items-center gap-2">
+                                <i class="fas fa-upload text-[13px]"></i> Upload Laporan
+                            </button>
+                        </div>
+                    </form>
                 </div>
 
                 <!-- Riwayat Laporan -->
@@ -132,49 +165,40 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
-
-                                <!-- Row 1: Approved -->
-                                <tr class="hover:bg-gray-50/50 transition-colors">
-                                    <td class="px-6 md:px-8 py-5">
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center shrink-0">
-                                                <i class="fas fa-file-pdf text-red-500 text-[15px]"></i>
+                                <?php if (empty($laporanList)): ?>
+                                    <tr>
+                                        <td colspan="3" class="px-6 py-12 text-center text-gray-400">
+                                            <i class="fas fa-folder-open text-3xl mb-3 block"></i>
+                                            Belum ada laporan yang diupload.
+                                        </td>
+                                    </tr>
+                                <?php else: ?>
+                                    <?php foreach ($laporanList as $laporan):
+                                        $namaFile = basename($laporan['file']);
+                                        $tgl = date('d F Y', strtotime($laporan['tanggal_upload']));
+                                    ?>
+                                    <tr class="hover:bg-gray-50/50 transition-colors">
+                                        <td class="px-6 md:px-8 py-5">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center shrink-0">
+                                                    <i class="fas fa-file-pdf text-red-500 text-[15px]"></i>
+                                                </div>
+                                                <div>
+                                                    <span class="font-medium text-gray-800 block"><?= htmlspecialchars($namaFile) ?></span>
+                                                    <span class="text-[12px] text-gray-400"><?= htmlspecialchars($laporan['jenis_laporan']) ?></span>
+                                                </div>
                                             </div>
-                                            <span class="font-medium text-gray-800">Laporan_PKL_Final.pdf</span>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-5 text-gray-500 text-center">15 Januari 2024</td>
-                                    <td class="px-6 py-5 text-center">
-                                        <div class="flex items-center justify-center gap-4">
-                                            <span class="text-[#10b981] font-semibold text-[13px]">Approved</span>
-                                            <a href="#" class="flex items-center gap-1.5 text-blue-500 hover:text-blue-700 font-medium text-[13px] transition-colors">
-                                                <i class="fas fa-eye text-[13px]"></i> View
+                                        </td>
+                                        <td class="px-6 py-5 text-gray-500 text-center"><?= $tgl ?></td>
+                                        <td class="px-6 py-5 text-center">
+                                            <a href="../<?= htmlspecialchars($laporan['file']) ?>" target="_blank"
+                                               class="flex items-center justify-center gap-1.5 text-blue-500 hover:text-blue-700 font-medium text-[13px] transition-colors">
+                                                <i class="fas fa-eye text-[13px]"></i> Lihat
                                             </a>
-                                        </div>
-                                    </td>
-                                </tr>
-
-                                <!-- Row 2: Pending -->
-                                <tr class="hover:bg-gray-50/50 transition-colors">
-                                    <td class="px-6 md:px-8 py-5">
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center shrink-0">
-                                                <i class="fas fa-file-pdf text-red-500 text-[15px]"></i>
-                                            </div>
-                                            <span class="font-medium text-gray-800">Laporan_Draft_v2.pdf</span>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-5 text-gray-500 text-center">10 Januari 2024</td>
-                                    <td class="px-6 py-5 text-center">
-                                        <div class="flex items-center justify-center gap-4">
-                                            <span class="text-[#f97316] font-semibold text-[13px]">Pending</span>
-                                            <a href="#" class="flex items-center gap-1.5 text-blue-500 hover:text-blue-700 font-medium text-[13px] transition-colors">
-                                                <i class="fas fa-eye text-[13px]"></i> View
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>

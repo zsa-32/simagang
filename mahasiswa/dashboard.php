@@ -1,8 +1,16 @@
 <?php
 session_start();
 require_once '../config/db_connect.php';
+
+// Session Guard: harus login sebagai mahasiswa
+if (!isset($_SESSION['id_user']) || strtolower($_SESSION['role_name']) !== 'mahasiswa') {
+    header('Location: ../index.php');
+    exit();
+}
+
 $role = 'mahasiswa';
 $activePage = 'dashboard';
+$userName = $_SESSION['nama'] ?? 'Mahasiswa';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -43,7 +51,7 @@ $activePage = 'dashboard';
                     class="bg-[#3b66f5] rounded-2xl p-8 flex items-center justify-between shadow-sm relative overflow-hidden">
 
                     <div class="text-white z-10 relative">
-                        <h2 class="text-2xl font-bold mb-2 tracking-tight">Welcome back, Rizki!</h2>
+                        <h2 class="text-2xl font-bold mb-2 tracking-tight">Welcome back, <?= htmlspecialchars($userName) ?>!</h2>
                         <p class="text-blue-100 text-[15px]">Ready to continue your internship journey?</p>
                     </div>
 

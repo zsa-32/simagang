@@ -1,7 +1,57 @@
 <?php
 session_start();
+require_once '../config/db_connect.php';
+
+if (!isset($_SESSION['id_user']) || strtolower($_SESSION['role_name']) !== 'admin') {
+    header('Location: ../index.php'); exit();
+}
+
 $role = 'admin';
 $activePage = 'monitoring_dosen';
+
+// Daftar dosen + stats bimbingan
+$stmt = $conn->query("
+    SELECT
+        u.id_user, u.nama,
+        p.nip,
+        -- Jumlah mahasiswa yang dibimbing
+        (SELECT COUNT(*) FROM Profile WHERE id_dosen_pembimbing = u.id_user) AS total_mhs,
+        -- Jumlah yang sudah dinilai (ada nilai_akhir)
+        (SELECT COUNT(*) FROM Final_evaluation fe
+         JOIN Profile pm ON fe.id_user = pm.id_user
+         WHERE pm.id_dosen_pembimbing = u.id_user AND fe.nilai_akhir IS NOT NULL) AS sudah_dinilai,
+        -- Jumlah catatan bimbingan (jurnal yg ada catatan_dosen)
+        (SELECT COUNT(*) FROM Daily_journal dj
+         JOIN Profile pm ON dj.id_user = pm.id_user
+         WHERE pm.id_dosen_pembimbing = u.id_user AND dj.catatan_dosen IS NOT NULL) AS jml_catatan,
+        -- Jurnal terakhir dikomentari
+        (SELECT MAX(dj.tanggal) FROM Daily_journal dj
+         JOIN Profile pm ON dj.id_user = pm.id_user
+         WHERE pm.id_dosen_pembimbing = u.id_user AND dj.catatan_dosen IS NOT NULL) AS last_aktif
+    FROM Users u
+    JOIN Profile p ON u.id_user = p.id_user
+    JOIN Users_role ur ON u.id_user = ur.id_user
+    JOIN Roles r ON ur.id_role = r.id_role
+    WHERE LOWER(r.nama_role) = 'dosen pembimbing'
+    ORDER BY u.nama ASC
+");
+$dosenList = $stmt->fetchAll();
+
+// Hitung stat cards
+$totalDosen    = count($dosenList);
+$selesaiMenilai = count(array_filter($dosenList, fn($d) =>
+    $d['total_mhs'] > 0 && $d['sudah_dinilai'] >= $d['total_mhs']
+));
+$perluTindak   = count(array_filter($dosenList, fn($d) =>
+    $d['total_mhs'] > 0 && $d['sudah_dinilai'] < $d['total_mhs']
+));
+
+// Data untuk stacked bar chart
+$chartLabels  = json_encode(array_map(fn($d) => explode(',', $d['nama'])[0], $dosenList));
+$chartDinilai = json_encode(array_map(fn($d) => (int)$d['sudah_dinilai'], $dosenList));
+$chartBelum   = json_encode(array_map(fn($d) => max(0, (int)$d['total_mhs'] - (int)$d['sudah_dinilai']), $dosenList));
+
+$avatarColors = ['bg-blue-600','bg-purple-500','bg-indigo-500','bg-teal-600','bg-rose-500','bg-orange-500'];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -53,7 +103,7 @@ $activePage = 'monitoring_dosen';
                         </div>
                         <div>
                             <p class="text-[13px] text-gray-500">Total Dosen</p>
-                            <p class="text-2xl font-bold text-gray-900">6</p>
+                            <p class="text-2xl font-bold text-gray-900"><?= $totalDosen ?></p>
                         </div>
                     </div>
                     <!-- Selesai Menilai -->
@@ -63,7 +113,7 @@ $activePage = 'monitoring_dosen';
                         </div>
                         <div>
                             <p class="text-[13px] text-gray-500">Selesai Menilai</p>
-                            <p class="text-2xl font-bold text-gray-900">2</p>
+                            <p class="text-2xl font-bold text-gray-900"><?= $selesaiMenilai ?></p>
                         </div>
                     </div>
                     <!-- Perlu Tindak Lanjut -->
@@ -73,7 +123,7 @@ $activePage = 'monitoring_dosen';
                         </div>
                         <div>
                             <p class="text-[13px] text-gray-500">Perlu Tindak Lanjut</p>
-                            <p class="text-2xl font-bold text-gray-900">2</p>
+                            <p class="text-2xl font-bold text-gray-900"><?= $perluTindak ?></p>
                         </div>
                     </div>
                 </div>
@@ -115,60 +165,60 @@ $activePage = 'monitoring_dosen';
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-50">
-                                <?php
-                                $dosenList = [
-                                    ['nama' => 'Dr. Budi Santoso, M.Kom',   'nip' => '198501012010011001', 'mhs' => 8, 'dinilai' => 6, 'catatan' => 24, 'status' => 'Proses',   'aktif' => '30 menit lalu', 'color' => 'bg-blue-600'],
-                                    ['nama' => 'Dr. Siti Rahayu, M.T',      'nip' => '198703022012012002', 'mhs' => 7, 'dinilai' => 7, 'catatan' => 28, 'status' => 'Selesai',  'aktif' => '1 jam lalu',    'color' => 'bg-purple-500'],
-                                    ['nama' => 'Ir. Made Wirawan, M.Sc',    'nip' => '198204152008011003', 'mhs' => 6, 'dinilai' => 3, 'catatan' => 12, 'status' => 'Proses',   'aktif' => '3 jam lalu',    'color' => 'bg-indigo-500'],
-                                    ['nama' => 'Dr. Agus Prasetyo, M.Eng',  'nip' => '197909122005011004', 'mhs' => 5, 'dinilai' => 5, 'catatan' => 20, 'status' => 'Selesai',  'aktif' => 'Kemarin',       'color' => 'bg-teal-600'],
-                                    ['nama' => 'Dr. Nurul Hidayah, M.Cs',   'nip' => '198611082011012005', 'mhs' => 4, 'dinilai' => 1, 'catatan' => 8,  'status' => 'Tertunda', 'aktif' => '2 hari lalu',   'color' => 'bg-purple-600'],
-                                    ['nama' => 'Dr. Eko Widodo, M.Kom',     'nip' => '198012242007011006', 'mhs' => 2, 'dinilai' => 0, 'catatan' => 4,  'status' => 'Tertunda', 'aktif' => '5 hari lalu',   'color' => 'bg-orange-500'],
-                                ];
-                                $statusStyle = [
-                                    'Proses'   => ['bg' => 'bg-blue-50 text-blue-600',   'icon' => 'fa-clock text-blue-500'],
-                                    'Selesai'  => ['bg' => 'bg-green-50 text-green-600', 'icon' => 'fa-circle-check text-green-500'],
-                                    'Tertunda' => ['bg' => 'bg-amber-50 text-amber-600', 'icon' => 'fa-triangle-exclamation text-amber-500'],
-                                ];
-                                foreach ($dosenList as $d):
-                                    $pct = $d['mhs'] > 0 ? round($d['dinilai'] / $d['mhs'] * 100) : 0;
-                                    $barColor = $pct >= 100 ? 'bg-green-500' : ($pct >= 50 ? 'bg-blue-500' : 'bg-blue-300');
-                                    $s = $statusStyle[$d['status']];
+                                <?php if (empty($dosenList)): ?>
+                                    <tr><td colspan="7" class="px-6 py-10 text-center text-gray-400"><i class="fas fa-chalkboard-teacher text-3xl mb-2 block"></i>Belum ada dosen terdaftar.</td></tr>
+                                <?php else: ?>
+                                <?php foreach ($dosenList as $i => $d):
+                                    $totalMhs   = (int)$d['total_mhs'];
+                                    $dinilai    = (int)$d['sudah_dinilai'];
+                                    $pct        = $totalMhs > 0 ? round($dinilai / $totalMhs * 100) : 0;
+                                    $barColor   = $pct >= 100 ? 'bg-green-500' : ($pct >= 50 ? 'bg-blue-500' : 'bg-blue-300');
+                                    $avatarColor = $avatarColors[$i % count($avatarColors)];
+
+                                    if ($totalMhs === 0)             { $status = 'Belum';    $s = ['bg'=>'bg-gray-100 text-gray-500',   'icon'=>'fa-minus-circle text-gray-400']; }
+                                    elseif ($dinilai >= $totalMhs)  { $status = 'Selesai';  $s = ['bg'=>'bg-green-50 text-green-600', 'icon'=>'fa-circle-check text-green-500']; }
+                                    elseif ($dinilai > 0)           { $status = 'Proses';   $s = ['bg'=>'bg-blue-50 text-blue-600',   'icon'=>'fa-clock text-blue-500']; }
+                                    else                            { $status = 'Tertunda'; $s = ['bg'=>'bg-amber-50 text-amber-600', 'icon'=>'fa-triangle-exclamation text-amber-500']; }
+
+                                    $lastAktif = $d['last_aktif']
+                                        ? date('d M Y', strtotime($d['last_aktif']))
+                                        : '-';
                                 ?>
-                                <tr class="hover:bg-gray-50 transition-colors dosen-row" data-search="<?= strtolower($d['nama'] . ' ' . $d['nip']) ?>">
+                                <tr class="hover:bg-gray-50 transition-colors dosen-row" data-search="<?= strtolower($d['nama'] . ' ' . ($d['nip'] ?? '')) ?>">
                                     <!-- Dosen -->
                                     <td class="px-6 py-4">
                                         <div class="flex items-center gap-3">
-                                            <div class="w-9 h-9 rounded-full <?= $d['color'] ?> text-white flex items-center justify-center text-[13px] font-bold shrink-0">
+                                            <div class="w-9 h-9 rounded-full <?= $avatarColor ?> text-white flex items-center justify-center text-[13px] font-bold shrink-0">
                                                 <?= strtoupper(substr($d['nama'], 0, 1)) ?>
                                             </div>
                                             <div>
                                                 <p class="font-semibold text-gray-800 text-[13px]"><?= htmlspecialchars($d['nama']) ?></p>
-                                                <p class="text-[11px] text-gray-400"><?= $d['nip'] ?></p>
+                                                <p class="text-[11px] text-gray-400"><?= htmlspecialchars($d['nip'] ?? '-') ?></p>
                                             </div>
                                         </div>
                                     </td>
                                     <!-- Mahasiswa -->
-                                    <td class="px-4 py-4 text-[13px] text-gray-700 font-semibold"><?= $d['mhs'] ?></td>
+                                    <td class="px-4 py-4 text-[13px] text-gray-700 font-semibold"><?= $totalMhs ?></td>
                                     <!-- Penilaian -->
                                     <td class="px-4 py-4">
                                         <div class="flex items-center gap-2.5">
                                             <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
                                                 <div class="h-full <?= $barColor ?> rounded-full transition-all" style="width: <?= $pct ?>%"></div>
                                             </div>
-                                            <span class="text-[12px] text-gray-500 font-medium whitespace-nowrap"><?= $d['dinilai'] ?>/<?= $d['mhs'] ?></span>
+                                            <span class="text-[12px] text-gray-500 font-medium whitespace-nowrap"><?= $dinilai ?>/<?= $totalMhs ?></span>
                                         </div>
                                     </td>
                                     <!-- Catatan Bimbingan -->
-                                    <td class="px-4 py-4 text-[13px] text-gray-700"><?= $d['catatan'] ?></td>
+                                    <td class="px-4 py-4 text-[13px] text-gray-700"><?= (int)$d['jml_catatan'] ?></td>
                                     <!-- Status -->
                                     <td class="px-4 py-4">
                                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-semibold <?= $s['bg'] ?>">
                                             <i class="fas <?= $s['icon'] ?> text-[10px]"></i>
-                                            <?= $d['status'] ?>
+                                            <?= $status ?>
                                         </span>
                                     </td>
                                     <!-- Aktivitas Terakhir -->
-                                    <td class="px-4 py-4 text-[13px] text-gray-500"><?= $d['aktif'] ?></td>
+                                    <td class="px-4 py-4 text-[13px] text-gray-500"><?= $lastAktif ?></td>
                                     <!-- Aksi -->
                                     <td class="px-4 py-4">
                                         <button class="inline-flex items-center gap-1.5 px-3.5 py-1.5 border border-blue-200 text-blue-600 text-[12px] font-semibold rounded-lg hover:bg-blue-50 transition-colors">
@@ -177,6 +227,7 @@ $activePage = 'monitoring_dosen';
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -194,18 +245,18 @@ $activePage = 'monitoring_dosen';
             new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Budi Santoso', 'Siti Rahayu', 'Made Wirawan', 'Agus Prasetyo', 'Nurul Hidayah', 'Eko Widodo'],
+                    labels: <?= $chartLabels ?>,
                     datasets: [
                         {
                             label: 'Selesai Menilai',
-                            data: [6, 7, 3, 5, 1, 0],
+                            data: <?= $chartDinilai ?>,
                             backgroundColor: '#10b981',
                             borderRadius: 0,
                             stack: 'penilaian',
                         },
                         {
                             label: 'Belum Menilai',
-                            data: [2, 0, 3, 0, 3, 2],
+                            data: <?= $chartBelum ?>,
                             backgroundColor: '#f59e0b',
                             borderRadius: 4,
                             stack: 'penilaian',

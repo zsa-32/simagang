@@ -1,7 +1,70 @@
 <?php
     session_start();
+    require_once '../config/db_connect.php';
+
+    if (!isset($_SESSION['id_user']) || strtolower($_SESSION['role_name']) !== 'dosen pembimbing') {
+        header('Location: ../index.php'); exit();
+    }
+
     $role = 'dosen';
     $activePage = 'dashboard';
+    $id_dosen = (int) $_SESSION['id_user'];
+
+    // Total mahasiswa bimbingan
+    $stmtMhs = $conn->prepare("SELECT COUNT(*) as total FROM Profile WHERE id_dosen_pembimbing = :id");
+    $stmtMhs->execute([':id' => $id_dosen]);
+    $totalMhs = $stmtMhs->fetch()['total'];
+
+    // Jurnal pending (Menunggu) dari mahasiswa bimbingan
+    $stmtJP = $conn->prepare("
+        SELECT COUNT(*) as total FROM Daily_journal dj
+        JOIN Profile p ON dj.id_user = p.id_user
+        WHERE p.id_dosen_pembimbing = :id AND dj.status = 'Menunggu'
+    ");
+    $stmtJP->execute([':id' => $id_dosen]);
+    $jurnalPending = $stmtJP->fetch()['total'];
+
+    // Laporan masuk
+    $stmtLap = $conn->prepare("
+        SELECT COUNT(*) as total FROM Reports r
+        JOIN Profile p ON r.id_user = p.id_user
+        WHERE p.id_dosen_pembimbing = :id
+    ");
+    $stmtLap->execute([':id' => $id_dosen]);
+    $laporanMasuk = $stmtLap->fetch()['total'];
+
+    // Penilaian selesai (sudah ada nilai_akhir)
+    $stmtNilai = $conn->prepare("
+        SELECT COUNT(*) as total FROM Final_evaluation fe
+        JOIN Profile p ON fe.id_user = p.id_user
+        WHERE p.id_dosen_pembimbing = :id AND fe.nilai_akhir IS NOT NULL
+    ");
+    $stmtNilai->execute([':id' => $id_dosen]);
+    $penilaianSelesai = $stmtNilai->fetch()['total'];
+
+    // Daftar mahasiswa bimbingan + stats
+    $stmtList = $conn->prepare("
+        SELECT u.id_user, u.nama, p.nim,
+               c.nama_company AS instansi,
+               (SELECT COUNT(*) FROM Daily_journal WHERE id_user = u.id_user) AS total_jurnal,
+               (SELECT COUNT(*) FROM Attendances WHERE id_user = u.id_user AND keterangan = 'Hadir') AS hadir_count,
+               (SELECT COUNT(*) FROM Attendances WHERE id_user = u.id_user) AS total_absen,
+               fe.nilai_akhir
+        FROM Users u
+        JOIN Profile p ON u.id_user = p.id_user
+        LEFT JOIN Internship_placement ip ON u.id_user = ip.id_user
+        LEFT JOIN Company c ON ip.id_company = c.id_company
+        LEFT JOIN Final_evaluation fe ON fe.id_user = u.id_user
+        WHERE p.id_dosen_pembimbing = :id
+        ORDER BY u.nama ASC
+        LIMIT 10
+    ");
+    $stmtList->execute([':id' => $id_dosen]);
+    $students = $stmtList->fetchAll();
+
+    // Data untuk donut chart penilaian
+    $dinilai  = $penilaianSelesai;
+    $belum    = max(0, $totalMhs - $dinilai);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -78,7 +141,7 @@
                             <span class="text-[11px] font-semibold text-green-500 bg-green-50 px-2 py-1 rounded-full">Aktif</span>
                         </div>
                         <p class="text-[13px] text-gray-500 mb-1">Mhs Bimbingan</p>
-                        <p class="text-3xl font-bold text-gray-900">12</p>
+                        <p class="text-3xl font-bold text-gray-900"><?= $totalMhs ?></p>
                         <p class="text-[12px] text-gray-400 mt-1">Mahasiswa aktif magang</p>
                     </div>
 
@@ -91,7 +154,7 @@
                             <span class="text-[11px] font-semibold text-orange-500 bg-orange-50 px-2 py-1 rounded-full">Pending</span>
                         </div>
                         <p class="text-[13px] text-gray-500 mb-1">Jurnal Pending</p>
-                        <p class="text-3xl font-bold text-gray-900">7</p>
+                        <p class="text-3xl font-bold text-gray-900"><?= $jurnalPending ?></p>
                         <p class="text-[12px] text-gray-400 mt-1">Menunggu review Anda</p>
                     </div>
 
@@ -104,7 +167,7 @@
                             <span class="text-[11px] font-semibold text-purple-500 bg-purple-50 px-2 py-1 rounded-full">Baru</span>
                         </div>
                         <p class="text-[13px] text-gray-500 mb-1">Laporan Masuk</p>
-                        <p class="text-3xl font-bold text-gray-900">4</p>
+                        <p class="text-3xl font-bold text-gray-900"><?= $laporanMasuk ?></p>
                         <p class="text-[12px] text-gray-400 mt-1">Laporan akhir diterima</p>
                     </div>
 
@@ -117,8 +180,8 @@
                             <span class="text-[11px] font-semibold text-green-500 bg-green-50 px-2 py-1 rounded-full">Selesai</span>
                         </div>
                         <p class="text-[13px] text-gray-500 mb-1">Penilaian Selesai</p>
-                        <p class="text-3xl font-bold text-gray-900">8</p>
-                        <p class="text-[12px] text-gray-400 mt-1">Dari 12 mahasiswa</p>
+                        <p class="text-3xl font-bold text-gray-900"><?= $penilaianSelesai ?></p>
+                        <p class="text-[12px] text-gray-400 mt-1">Dari <?= $totalMhs ?> mahasiswa</p>
                     </div>
 
                 </div>
@@ -210,24 +273,18 @@
                             </thead>
                             <tbody class="divide-y divide-gray-100">
 
-                                <?php
-                                $students = [
-                                    ['no'=>1,'nama'=>'Ahmad Fauzi','nim'=>'20210001','instansi'=>'PT. Telkom Indonesia','jurnal'=>28,'hadir'=>92,'status'=>'Dinilai'],
-                                    ['no'=>2,'nama'=>'Budi Santoso','nim'=>'20210002','instansi'=>'CV. Karya Digital','jurnal'=>24,'hadir'=>87,'status'=>'Proses'],
-                                    ['no'=>3,'nama'=>'Citra Dewi','nim'=>'20210003','instansi'=>'PT. Bank BRI','jurnal'=>30,'hadir'=>95,'status'=>'Dinilai'],
-                                    ['no'=>4,'nama'=>'Deni Setiawan','nim'=>'20210004','instansi'=>'Dinas Kominfo Kota','jurnal'=>15,'hadir'=>76,'status'=>'Belum'],
-                                    ['no'=>5,'nama'=>'Eka Rahmawati','nim'=>'20210005','instansi'=>'PT. Indosat Ooredoo','jurnal'=>22,'hadir'=>89,'status'=>'Proses'],
-                                ];
-                                foreach ($students as $s):
-                                    $statusClass = match($s['status']) {
-                                        'Dinilai' => 'bg-green-100 text-green-700',
-                                        'Proses'  => 'bg-yellow-100 text-yellow-700',
-                                        default   => 'bg-red-100 text-red-600',
-                                    };
-                                    $hadirColor = $s['hadir'] >= 90 ? 'text-green-600' : ($s['hadir'] >= 80 ? 'text-yellow-600' : 'text-red-500');
+                                <?php if (empty($students)): ?>
+                                    <tr><td colspan="7" class="px-6 py-10 text-center text-gray-400"><i class="fas fa-users text-3xl mb-2 block"></i>Belum ada mahasiswa bimbingan.</td></tr>
+                                <?php else: ?>
+                                <?php foreach ($students as $no => $s):
+                                    $pctHadir = $s['total_absen'] > 0 ? round($s['hadir_count'] / $s['total_absen'] * 100) : 0;
+                                    $hadirColor = $pctHadir >= 90 ? 'text-green-600' : ($pctHadir >= 80 ? 'text-yellow-600' : 'text-red-500');
+                                    if ($s['nilai_akhir'] !== null)       { $status = 'Dinilai';  $statusClass = 'bg-green-100 text-green-700'; }
+                                    elseif ($s['total_jurnal'] > 0)       { $status = 'Proses';   $statusClass = 'bg-yellow-100 text-yellow-700'; }
+                                    else                                  { $status = 'Belum';    $statusClass = 'bg-red-100 text-red-600'; }
                                 ?>
                                 <tr class="student-row transition-colors">
-                                    <td class="px-6 py-4 text-gray-400"><?= $s['no'] ?></td>
+                                    <td class="px-6 py-4 text-gray-400"><?= $no + 1 ?></td>
                                     <td class="px-6 py-4">
                                         <div class="flex items-center gap-3">
                                             <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-[12px] shrink-0">
@@ -235,28 +292,27 @@
                                             </div>
                                             <div>
                                                 <p class="font-semibold text-gray-800"><?= htmlspecialchars($s['nama']) ?></p>
-                                                <p class="text-[12px] text-gray-400"><?= $s['nim'] ?></p>
+                                                <p class="text-[12px] text-gray-400"><?= htmlspecialchars($s['nim'] ?? '-') ?></p>
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 text-gray-600"><?= htmlspecialchars($s['instansi']) ?></td>
+                                    <td class="px-6 py-4 text-gray-600"><?= htmlspecialchars($s['instansi'] ?? '-') ?></td>
                                     <td class="px-6 py-4">
-                                        <span class="font-semibold text-gray-800"><?= $s['jurnal'] ?></span>
+                                        <span class="font-semibold text-gray-800"><?= $s['total_jurnal'] ?></span>
                                         <span class="text-gray-400"> jurnal</span>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <span class="font-semibold <?= $hadirColor ?>"><?= $s['hadir'] ?>%</span>
+                                        <span class="font-semibold <?= $hadirColor ?>"><?= $pctHadir ?>%</span>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <span class="px-3 py-1 rounded-full text-[12px] font-semibold <?= $statusClass ?>">
-                                            <?= $s['status'] ?>
-                                        </span>
+                                        <span class="px-3 py-1 rounded-full text-[12px] font-semibold <?= $statusClass ?>"><?= $status ?></span>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <a href="#" class="text-blue-600 hover:text-blue-800 text-[13px] font-medium hover:underline">Detail</a>
+                                        <a href="mhs_bimbingan.php" class="text-blue-600 hover:text-blue-800 text-[13px] font-medium hover:underline">Detail</a>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
+                                <?php endif; ?>
 
                             </tbody>
                         </table>
@@ -362,10 +418,10 @@
             new Chart(donutCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Sudah Dinilai', 'Dalam Proses', 'Belum Dinilai'],
+                    labels: ['Sudah Dinilai', 'Belum Dinilai'],
                     datasets: [{
-                        data: [8, 2, 2],
-                        backgroundColor: ['#10b981', '#fbbf24', '#ef4444'],
+                        data: [<?= $dinilai ?>, <?= $belum ?>],
+                        backgroundColor: ['#10b981', '#ef4444'],
                         borderWidth: 0,
                         hoverOffset: 6
                     }]

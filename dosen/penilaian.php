@@ -1,7 +1,17 @@
 <?php
     session_start();
+    require_once '../config/db_connect.php';
+
+    if (!isset($_SESSION['id_user']) || strtolower($_SESSION['role_name']) !== 'dosen pembimbing') {
+        header('Location: ../index.php'); exit();
+    }
+
     $role = 'dosen';
     $activePage = 'penilaian';
+    $id_dosen   = (int) $_SESSION['id_user'];
+
+    // Notifikasi
+    $notif = $_GET['success'] ?? null;
 
     // Grade helper
     function getGrade(int $nilai): string {
@@ -20,90 +30,30 @@
         };
     }
 
-    // Student data
-    $students = [
-        [
-            'id'       => 1,
-            'nama'     => 'Balmond',
-            'nim'      => '211134341',
-            'instansi' => 'PT Telkom Indonesia',
-            'file'     => 'Laporan_Akhir_Balmond.pdf',
-            'fileDate' => '15 Januari 2026',
-            'fileStatus'=> 'Pending',
-            'nilaiLaporan' => 88,
-            'nilaiSeminar' => null,
-        ],
-        [
-            'id'       => 2,
-            'nama'     => 'Lesley',
-            'nim'      => '20133432',
-            'instansi' => 'CV Digital Kreatif',
-            'file'     => 'Laporan_Akhir_Lesley.pdf',
-            'fileDate' => '18 Januari 2026',
-            'fileStatus'=> 'Pending',
-            'nilaiLaporan' => null,
-            'nilaiSeminar' => null,
-        ],
-        [
-            'id'       => 3,
-            'nama'     => 'Harley',
-            'nim'      => '22123232',
-            'instansi' => 'PT Bank BRI',
-            'file'     => 'Laporan_Akhir_Harley.pdf',
-            'fileDate' => '20 Januari 2026',
-            'fileStatus'=> 'Pending',
-            'nilaiLaporan' => null,
-            'nilaiSeminar' => null,
-        ],
-        [
-            'id'       => 4,
-            'nama'     => 'Budi Santoso',
-            'nim'      => '21140004',
-            'instansi' => 'PT Astra International',
-            'file'     => 'Laporan_Akhir_Budi.pdf',
-            'fileDate' => '10 Januari 2026',
-            'fileStatus'=> 'Disetujui',
-            'nilaiLaporan' => 92,
-            'nilaiSeminar' => 88,
-        ],
-        [
-            'id'       => 5,
-            'nama'     => 'Joko',
-            'nim'      => '22130003',
-            'instansi' => 'PT Tokopedia',
-            'file'     => 'Laporan_Akhir_Joko.pdf',
-            'fileDate' => '22 Januari 2026',
-            'fileStatus'=> 'Pending',
-            'nilaiLaporan' => null,
-            'nilaiSeminar' => null,
-        ],
-        [
-            'id'       => 6,
-            'nama'     => 'Meks Panda',
-            'nim'      => '22130043',
-            'instansi' => 'PT Gojek Indonesia',
-            'file'     => 'Laporan_Akhir_Meks.pdf',
-            'fileDate' => '12 Januari 2026',
-            'fileStatus'=> 'Pending',
-            'nilaiLaporan' => 85,
-            'nilaiSeminar' => null,
-        ],
-        [
-            'id'       => 7,
-            'nama'     => 'Nana',
-            'nim'      => '2213563',
-            'instansi' => 'PT Bukalapak',
-            'file'     => 'Laporan_Akhir_Nana.pdf',
-            'fileDate' => '25 Januari 2026',
-            'fileStatus'=> 'Pending',
-            'nilaiLaporan' => null,
-            'nilaiSeminar' => null,
-        ],
-    ];
+    // Ambil mahasiswa bimbingan + nilai + laporan terakhir
+    $stmt = $conn->prepare("
+        SELECT
+            u.id_user, u.nama,
+            p.nim,
+            c.nama_company AS instansi,
+            fe.nilai_laporan, fe.nilai_seminar, fe.catatan AS catatan_nilai,
+            -- Laporan terakhir
+            (SELECT r.file FROM Reports r WHERE r.id_user = u.id_user ORDER BY r.tanggal_upload DESC LIMIT 1) AS file_laporan,
+            (SELECT r.tanggal_upload FROM Reports r WHERE r.id_user = u.id_user ORDER BY r.tanggal_upload DESC LIMIT 1) AS tgl_laporan
+        FROM Users u
+        JOIN Profile p ON u.id_user = p.id_user
+        LEFT JOIN Internship_placement ip ON u.id_user = ip.id_user
+        LEFT JOIN Company c ON ip.id_company = c.id_company
+        LEFT JOIN Final_evaluation fe ON fe.id_user = u.id_user
+        WHERE p.id_dosen_pembimbing = :id_dosen
+        ORDER BY u.nama ASC
+    ");
+    $stmt->execute([':id_dosen' => $id_dosen]);
+    $students = $stmt->fetchAll();
 
-    $sudahLengkap    = count(array_filter($students, fn($s) => $s['nilaiLaporan'] !== null && $s['nilaiSeminar'] !== null));
-    $laporanKosong   = count(array_filter($students, fn($s) => $s['nilaiLaporan'] === null));
-    $seminarKosong   = count(array_filter($students, fn($s) => $s['nilaiSeminar'] === null));
+    $sudahLengkap  = count(array_filter($students, fn($s) => $s['nilai_laporan'] !== null && $s['nilai_seminar'] !== null));
+    $laporanKosong = count(array_filter($students, fn($s) => $s['nilai_laporan'] === null));
+    $seminarKosong = count(array_filter($students, fn($s) => $s['nilai_seminar'] === null));
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -178,6 +128,14 @@
         <main class="flex-1 overflow-y-auto p-6 md:p-8 bg-[#f8f9fa]">
             <div class="max-w-[900px] mx-auto space-y-5">
 
+                <!-- Notifikasi -->
+                <?php if ($notif): ?>
+                <div id="notifBox" class="flex items-center gap-3 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-[13px] font-medium">
+                    <i class="fas fa-check-circle text-green-500"></i> Nilai berhasil disimpan.
+                    <button onclick="document.getElementById('notifBox').remove()" class="ml-auto text-green-400 hover:text-green-600"><i class="fas fa-times"></i></button>
+                </div>
+                <?php endif; ?>
+
                 <!-- Section Header Card -->
                 <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
@@ -211,31 +169,30 @@
                 <div class="space-y-3" id="studentList">
 
                     <?php foreach ($students as $s):
-                        $hasLaporan  = $s['nilaiLaporan'] !== null;
-                        $hasSeminar  = $s['nilaiSeminar'] !== null;
-                        $isLengkap   = $hasLaporan && $hasSeminar;
+                        $hasLaporan = $s['nilai_laporan'] !== null;
+                        $hasSeminar = $s['nilai_seminar'] !== null;
+                        $isLengkap  = $hasLaporan && $hasSeminar;
+                        $sid        = $s['id_user'];
 
-                        $gradeL = $hasLaporan ? getGrade($s['nilaiLaporan']) : null;
-                        $gradeS = $hasSeminar ? getGrade($s['nilaiSeminar']) : null;
+                        $gradeL = $hasLaporan ? getGrade((int)$s['nilai_laporan']) : null;
+                        $gradeS = $hasSeminar ? getGrade((int)$s['nilai_seminar']) : null;
 
                         $laporanDisplay = $hasLaporan
-                            ? '<span class="font-bold ' . gradeColor($gradeL) . '">' . $s['nilaiLaporan'] . '<span class="text-[11px] ml-0.5">(' . $gradeL . ')</span></span>'
+                            ? '<span class="font-bold ' . gradeColor($gradeL) . '">' . $s['nilai_laporan'] . '<span class="text-[11px] ml-0.5">(' . $gradeL . ')</span></span>'
                             : '<span class="text-gray-400">-(−)</span>';
                         $seminarDisplay = $hasSeminar
-                            ? '<span class="font-bold ' . gradeColor($gradeS) . '">' . $s['nilaiSeminar'] . '<span class="text-[11px] ml-0.5">(' . $gradeS . ')</span></span>'
+                            ? '<span class="font-bold ' . gradeColor($gradeS) . '">' . $s['nilai_seminar'] . '<span class="text-[11px] ml-0.5">(' . $gradeS . ')</span></span>'
                             : '<span class="text-gray-400">-(−)</span>';
 
-                        $fileStatusClass = match($s['fileStatus']) {
-                            'Disetujui' => 'bg-green-100 text-green-700',
-                            default     => 'bg-orange-100 text-orange-600',
-                        };
+                        $namaFile = $s['file_laporan'] ? basename($s['file_laporan']) : null;
+                        $tglFile  = $s['tgl_laporan']  ? date('d M Y', strtotime($s['tgl_laporan'])) : null;
                     ?>
                     <div class="accordion-item bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden student-searchable"
-                         data-name="<?= strtolower($s['nama']) ?> <?= $s['nim'] ?> <?= strtolower($s['instansi']) ?>">
+                         data-name="<?= strtolower($s['nama']) ?> <?= strtolower($s['nim'] ?? '') ?> <?= strtolower($s['instansi'] ?? '') ?>">
 
                         <!-- Clickable Header Row -->
                         <div class="student-header px-6 py-4 flex items-center gap-4 select-none"
-                             onclick="toggleAccordion(<?= $s['id'] ?>)">
+                             onclick="toggleAccordion(<?= $sid ?>)">
 
                             <!-- Avatar -->
                             <div class="w-11 h-11 rounded-full bg-gray-800 flex items-center justify-center text-white font-bold text-[13px] shrink-0">
@@ -245,7 +202,7 @@
                             <!-- Name + Info -->
                             <div class="flex-1 min-w-0">
                                 <p class="font-semibold text-gray-900 text-[15px] truncate"><?= htmlspecialchars($s['nama']) ?></p>
-                                <p class="text-[12px] text-gray-400 truncate"><?= $s['nim'] ?> · <?= htmlspecialchars($s['instansi']) ?></p>
+                                <p class="text-[12px] text-gray-400 truncate"><?= htmlspecialchars($s['nim'] ?? '-') ?> · <?= htmlspecialchars($s['instansi'] ?? '-') ?></p>
                             </div>
 
                             <!-- Nilai Labels -->
@@ -276,7 +233,7 @@
                         </div>
 
                         <!-- Accordion Panel (Dropdown Form) -->
-                        <div class="accordion-panel" id="panel-<?= $s['id'] ?>">
+                        <div class="accordion-panel" id="panel-<?= $sid ?>">
                             <div class="px-6 pb-6 pt-1">
                                 <!-- Divider -->
                                 <div class="border-t border-gray-100 mb-5"></div>
@@ -284,40 +241,45 @@
                                 <!-- Laporan Akhir Section -->
                                 <div class="mb-5">
                                     <p class="text-[14px] font-semibold text-gray-800 mb-3">Laporan Akhir</p>
+                                    <?php if ($namaFile): ?>
                                     <div class="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between border border-gray-100">
                                         <div class="flex items-center gap-3">
                                             <div class="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center shrink-0">
                                                 <i class="fas fa-file-pdf text-red-500 text-[14px]"></i>
                                             </div>
                                             <div>
-                                                <p class="text-[13px] font-semibold text-gray-700"><?= htmlspecialchars($s['file']) ?></p>
-                                                <p class="text-[11px] text-gray-400"><?= $s['fileDate'] ?></p>
+                                                <p class="text-[13px] font-semibold text-gray-700"><?= htmlspecialchars($namaFile) ?></p>
+                                                <p class="text-[11px] text-gray-400"><?= $tglFile ?></p>
                                             </div>
                                         </div>
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full <?= $fileStatusClass ?>">
-                                                <?= $s['fileStatus'] ?>
-                                            </span>
-                                            <button class="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 text-[12px] font-semibold border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors">
-                                                <i class="fas fa-eye text-[11px]"></i> Lihat
-                                            </button>
-                                        </div>
+                                        <a href="../<?= htmlspecialchars($s['file_laporan']) ?>" target="_blank"
+                                           class="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 text-[12px] font-semibold border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors">
+                                            <i class="fas fa-eye text-[11px]"></i> Lihat
+                                        </a>
                                     </div>
+                                    <?php else: ?>
+                                    <div class="bg-gray-50 rounded-xl px-4 py-3 text-[13px] text-gray-400 border border-gray-100">
+                                        <i class="fas fa-file-upload mr-2"></i>Mahasiswa belum mengupload laporan.
+                                    </div>
+                                    <?php endif; ?>
                                 </div>
 
                                 <!-- Score Inputs -->
+                                <form action="../proses/nilai_simpan.php" method="POST">
+                                <input type="hidden" name="id_user" value="<?= $sid ?>">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                                     <!-- Nilai Laporan -->
                                     <div>
                                         <label class="block text-[13px] font-semibold text-gray-700 mb-2">Nilai Laporan Akhir</label>
                                         <input type="number"
-                                               id="laporan-<?= $s['id'] ?>"
+                                               id="laporan-<?= $sid ?>"
+                                               name="nilai_laporan"
                                                min="0" max="100"
-                                               value="<?= $s['nilaiLaporan'] ?? '' ?>"
+                                               value="<?= $s['nilai_laporan'] ?? '' ?>"
                                                placeholder="0 – 100"
-                                               oninput="updateGrade(<?= $s['id'] ?>, 'laporan')"
+                                               oninput="updateGrade(<?= $sid ?>, 'laporan')"
                                                class="grade-input w-full border border-gray-200 rounded-xl px-4 py-3 text-[14px] text-gray-800 transition-all">
-                                        <p class="text-[12px] text-gray-400 mt-1.5" id="grade-laporan-<?= $s['id'] ?>">
+                                        <p class="text-[12px] text-gray-400 mt-1.5" id="grade-laporan-<?= $sid ?>">
                                             <?php if ($hasLaporan): ?>
                                                 Grade: <span class="font-bold <?= gradeColor($gradeL) ?>"><?= $gradeL ?></span>
                                             <?php endif; ?>
@@ -328,13 +290,14 @@
                                     <div>
                                         <label class="block text-[13px] font-semibold text-gray-700 mb-2">Nilai Seminar / Presentasi</label>
                                         <input type="number"
-                                               id="seminar-<?= $s['id'] ?>"
+                                               id="seminar-<?= $sid ?>"
+                                               name="nilai_seminar"
                                                min="0" max="100"
-                                               value="<?= $s['nilaiSeminar'] ?? '' ?>"
+                                               value="<?= $s['nilai_seminar'] ?? '' ?>"
                                                placeholder="0 – 100"
-                                               oninput="updateGrade(<?= $s['id'] ?>, 'seminar')"
+                                               oninput="updateGrade(<?= $sid ?>, 'seminar')"
                                                class="grade-input w-full border border-gray-200 rounded-xl px-4 py-3 text-[14px] text-gray-800 transition-all">
-                                        <p class="text-[12px] text-gray-400 mt-1.5" id="grade-seminar-<?= $s['id'] ?>">
+                                        <p class="text-[12px] text-gray-400 mt-1.5" id="grade-seminar-<?= $sid ?>">
                                             <?php if ($hasSeminar): ?>
                                                 Grade: <span class="font-bold <?= gradeColor($gradeS) ?>"><?= $gradeS ?></span>
                                             <?php endif; ?>
@@ -345,22 +308,23 @@
                                 <!-- Catatan -->
                                 <div class="mb-5">
                                     <label class="block text-[13px] font-semibold text-gray-700 mb-2">Catatan Bimbingan / Umpan Balik</label>
-                                    <textarea rows="3"
+                                    <textarea name="catatan" rows="3"
                                               placeholder="Berikan catatan atau umpan balik bimbingan..."
-                                              class="grade-input w-full border border-gray-200 rounded-xl px-4 py-3 text-[14px] text-gray-700 resize-none transition-all"></textarea>
+                                              class="grade-input w-full border border-gray-200 rounded-xl px-4 py-3 text-[14px] text-gray-700 resize-none transition-all"><?= htmlspecialchars($s['catatan_nilai'] ?? '') ?></textarea>
                                 </div>
 
                                 <!-- Action Buttons -->
                                 <div class="flex items-center justify-end gap-3">
-                                    <button onclick="toggleAccordion(<?= $s['id'] ?>)"
+                                    <button type="button" onclick="toggleAccordion(<?= $sid ?>)"
                                             class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-[13px] font-semibold hover:bg-gray-50 transition-colors">
                                         Batal
                                     </button>
-                                    <button onclick="saveNilai(<?= $s['id'] ?>)"
+                                    <button type="submit"
                                             class="flex items-center gap-2 px-5 py-2.5 bg-[#3b66f5] hover:bg-[#2d53d4] text-white rounded-xl text-[13px] font-semibold transition-colors shadow-sm shadow-blue-200">
                                         <i class="fas fa-save text-[12px]"></i> Simpan Nilai
                                     </button>
                                 </div>
+                                </form>
                             </div>
                         </div>
 
@@ -421,31 +385,8 @@
             currentOpen = isOpen ? null : id;
         }
 
-        // ─── Save Nilai (demo) ──────────────────────────────────────
-        function saveNilai(id) {
-            const laporan = document.getElementById(`laporan-${id}`).value;
-            const seminar = document.getElementById(`seminar-${id}`).value;
-
-            if (!laporan && !seminar) {
-                alert('Silakan isi minimal satu nilai.');
-                return;
-            }
-
-            // Visuall feedback
-            const btn = event.currentTarget;
-            btn.innerHTML = '<i class="fas fa-check text-[12px]"></i> Tersimpan!';
-            btn.classList.replace('bg-[#3b66f5]', 'bg-green-500');
-            btn.classList.replace('hover:bg-[#2d53d4]', 'hover:bg-green-600');
-            btn.classList.replace('shadow-blue-200', 'shadow-green-200');
-
-            setTimeout(() => {
-                btn.innerHTML = '<i class="fas fa-save text-[12px]"></i> Simpan Nilai';
-                btn.classList.replace('bg-green-500', 'bg-[#3b66f5]');
-                btn.classList.replace('hover:bg-green-600', 'hover:bg-[#2d53d4]');
-                btn.classList.replace('shadow-green-200', 'shadow-blue-200');
-                toggleAccordion(id);
-            }, 1200);
-        }
+        // ─── Save Nilai — dihapus karena sudah pakai form POST ──────
+        // saveNilai() tidak lagi dipakai
 
         // ─── Live Search ────────────────────────────────────────────
         document.getElementById('searchPenilaian').addEventListener('input', function () {

@@ -1,7 +1,35 @@
 <?php
 session_start();
+require_once '../config/db_connect.php';
+
+// Session Guard
+if (!isset($_SESSION['id_user']) || strtolower($_SESSION['role_name']) !== 'admin') {
+    header('Location: ../index.php');
+    exit();
+}
+
 $role = 'admin';
 $activePage = 'manajemen_user';
+
+// Ambil semua user dari database dengan JOIN ke role dan profil
+$stmt = $conn->query("
+    SELECT 
+        u.id_user, u.nama, u.email,
+        r.nama_role,
+        COALESCE(p.nim, p.nip, '-')  AS nomor_induk,
+        COALESCE(c.nama_company, '-') AS perusahaan
+    FROM Users u
+    LEFT JOIN Users_role   ur ON u.id_user   = ur.id_user
+    LEFT JOIN Roles         r  ON ur.id_role  = r.id_role
+    LEFT JOIN Profile       p  ON u.id_user   = p.id_user
+    LEFT JOIN Internship_placement ip ON u.id_user = ip.id_user
+    LEFT JOIN Company       c  ON ip.id_company = c.id_company
+    ORDER BY r.id_role ASC, u.nama ASC
+");
+$usersDB = $stmt->fetchAll();
+
+// Palet warna avatar bergilir
+$avatarColors = ['bg-blue-600','bg-indigo-500','bg-green-600','bg-blue-500','bg-purple-600','bg-purple-500','bg-indigo-600','bg-blue-700'];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -37,6 +65,38 @@ $activePage = 'manajemen_user';
         <main class="flex-1 overflow-y-auto p-6 md:p-8 bg-[#f8f9fa]">
             <div class="max-w-[1200px] mx-auto space-y-6">
 
+                <!-- Notifikasi -->
+                <?php if (isset($_GET['success'])): ?>
+                    <?php
+                    $msgs = [
+                        'akun_dibuat'   => 'Akun berhasil dibuat.',
+                        'user_diperbarui'=> 'Data user berhasil diperbarui.',
+                        'user_dihapus'  => 'User berhasil dihapus.',
+                    ];
+                    $msg = $msgs[$_GET['success']] ?? 'Berhasil.';
+                    ?>
+                    <div id="notifBox" class="flex items-center gap-3 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-[13px] font-medium">
+                        <i class="fas fa-check-circle text-green-500"></i> <?= htmlspecialchars($msg) ?>
+                        <button onclick="document.getElementById('notifBox').remove()" class="ml-auto text-green-400 hover:text-green-600"><i class="fas fa-times"></i></button>
+                    </div>
+                <?php elseif (isset($_GET['error'])): ?>
+                    <?php
+                    $errs = [
+                        'field_kosong'       => 'Harap lengkapi semua field yang wajib diisi.',
+                        'password_pendek'    => 'Password minimal 6 karakter.',
+                        'email_duplikat'     => 'Email sudah terdaftar, gunakan email lain.',
+                        'role_tidak_valid'   => 'Role yang dipilih tidak valid.',
+                        'id_tidak_valid'     => 'ID user tidak valid.',
+                        'hapus_diri_sendiri' => 'Anda tidak dapat menghapus akun sendiri.',
+                        'db_error'           => 'Terjadi kesalahan pada database, silakan coba lagi.',
+                    ];
+                    $err = $errs[$_GET['error']] ?? 'Terjadi kesalahan.';
+                    ?>
+                    <div id="notifBox" class="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-[13px] font-medium">
+                        <i class="fas fa-exclamation-circle text-red-500"></i> <?= htmlspecialchars($err) ?>
+                        <button onclick="document.getElementById('notifBox').remove()" class="ml-auto text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>
+                    </div>
+                <?php endif; ?>
                 <!-- Page Heading -->
                 <div class="flex items-center justify-between">
                     <div>
@@ -104,32 +164,36 @@ $activePage = 'manajemen_user';
                                         Aksi</th>
                                 </tr>
                             </thead>
-                            <tbody id="userTableBody" class="divide-y divide-gray-50">
                                 <?php
-                                $users = [
-                                    ['nama' => 'Balmond', 'email' => 'balmond@student.polije.ac.id', 'role' => 'Mahasiswa', 'id' => '21173431', 'perusahaan' => 'PT Telkom Indonesia', 'color' => 'bg-blue-600'],
-                                    ['nama' => 'Lesley', 'email' => 'lesley@student.polije.ac.id', 'role' => 'Mahasiswa', 'id' => '20193432', 'perusahaan' => 'CV Digital Kreatif', 'color' => 'bg-indigo-500'],
-                                    ['nama' => 'Harley', 'email' => 'harley@student.polije.ac.id', 'role' => 'Mahasiswa', 'id' => '22123532', 'perusahaan' => 'PT Bank BRI', 'color' => 'bg-green-600'],
-                                    ['nama' => 'Budi Santoso', 'email' => 'budi.s@student.polije.ac.id', 'role' => 'Mahasiswa', 'id' => '21140024', 'perusahaan' => 'PT Astra International', 'color' => 'bg-blue-500'],
-                                    ['nama' => 'Dr. Budi Santoso, M.Kom', 'email' => 'budi.santoso@polije.ac.id', 'role' => 'Dosen Pembimbing', 'id' => '198501012010011001', 'perusahaan' => '-', 'color' => 'bg-purple-600'],
-                                    ['nama' => 'Dr. Siti Rahayu, M.T', 'email' => 'siti.rahayu@polije.ac.id', 'role' => 'Dosen Pembimbing', 'id' => '198703022012012002', 'perusahaan' => '-', 'color' => 'bg-purple-500'],
-                                    ['nama' => 'Ir. Made Wirawan, M.Sc', 'email' => 'made.wirawan@polije.ac.id', 'role' => 'Dosen Pembimbing', 'id' => '198204152008011003', 'perusahaan' => '-', 'color' => 'bg-indigo-600'],
-                                    ['nama' => 'Joko', 'email' => 'joko@student.polije.ac.id', 'role' => 'Mahasiswa', 'id' => '21130003', 'perusahaan' => 'PT Tokopedia', 'color' => 'bg-blue-700'],
-                                ];
-                                foreach ($users as $u):
-                                    $initials = strtoupper(substr($u['nama'], 0, 1));
-                                    $isDosenRole = ($u['role'] === 'Dosen Pembimbing');
-                                    $roleBadge = $isDosenRole
-                                        ? 'bg-purple-100 text-purple-700'
-                                        : 'bg-blue-100 text-blue-700';
-                                    ?>
+                                $colorIdx = 0;
+                                foreach ($usersDB as $u):
+                                    $initials   = strtoupper(substr($u['nama'], 0, 1));
+                                    $roleLabel  = $u['nama_role'] ?? '-';
+                                    $roleLower  = strtolower($roleLabel);
+                                    $color      = $avatarColors[$colorIdx % count($avatarColors)];
+                                    $colorIdx++;
+
+                                    // Badge warna berdasarkan role
+                                    if ($roleLower === 'mahasiswa') {
+                                        $roleBadge = 'bg-blue-100 text-blue-700';
+                                        $dataRole  = 'mahasiswa';
+                                    } elseif ($roleLower === 'dosen pembimbing') {
+                                        $roleBadge = 'bg-purple-100 text-purple-700';
+                                        $dataRole  = 'dosen';
+                                    } elseif ($roleLower === 'pembimbing lapang') {
+                                        $roleBadge = 'bg-green-100 text-green-700';
+                                        $dataRole  = 'pembimbing';
+                                    } else {
+                                        $roleBadge = 'bg-gray-100 text-gray-600';
+                                        $dataRole  = 'admin';
+                                    }
+                                ?>
                                     <tr class="hover:bg-gray-50 transition-colors user-row"
-                                        data-role="<?= strtolower($isDosenRole ? 'dosen' : 'mahasiswa') ?>"
+                                        data-role="<?= $dataRole ?>"
                                         data-search="<?= strtolower($u['nama'] . ' ' . $u['email']) ?>">
                                         <td class="px-6 py-4">
                                             <div class="flex items-center gap-3">
-                                                <div
-                                                    class="w-9 h-9 rounded-full <?= $u['color'] ?> text-white flex items-center justify-center text-[13px] font-bold shrink-0">
+                                                <div class="w-9 h-9 rounded-full <?= $color ?> text-white flex items-center justify-center text-[13px] font-bold shrink-0">
                                                     <?= $initials ?></div>
                                                 <div>
                                                     <p class="font-semibold text-gray-800 text-[14px]">
@@ -140,24 +204,28 @@ $activePage = 'manajemen_user';
                                             </div>
                                         </td>
                                         <td class="px-6 py-4">
-                                            <span
-                                                class="px-3 py-1 rounded-lg text-[12px] font-semibold <?= $roleBadge ?>"><?= $u['role'] ?></span>
+                                            <span class="px-3 py-1 rounded-lg text-[12px] font-semibold <?= $roleBadge ?>"><?= htmlspecialchars($roleLabel) ?></span>
                                         </td>
-                                        <td class="px-6 py-4 text-[13px] text-gray-600 font-medium"><?= $u['id'] ?></td>
-                                        <td class="px-6 py-4 text-[13px] text-gray-600"><?= $u['perusahaan'] ?></td>
+                                        <td class="px-6 py-4 text-[13px] text-gray-600 font-medium"><?= htmlspecialchars($u['nomor_induk']) ?></td>
+                                        <td class="px-6 py-4 text-[13px] text-gray-600"><?= htmlspecialchars($u['perusahaan']) ?></td>
                                         <td class="px-6 py-4">
                                             <div class="flex items-center gap-2">
                                                 <button
                                                     class="w-8 h-8 rounded-lg border border-blue-200 text-blue-500 hover:bg-blue-50 transition-colors flex items-center justify-center"
                                                     title="Edit"
-                                                    onclick="openEditModal('<?= htmlspecialchars($u['nama']) ?>', '<?= htmlspecialchars($u['email']) ?>', '<?= htmlspecialchars($u['role']) ?>', '<?= htmlspecialchars($u['id']) ?>')">
+                                                    onclick="openEditModal('<?= $u['id_user'] ?>', '<?= htmlspecialchars($u['nama'], ENT_QUOTES) ?>', '<?= htmlspecialchars($u['email'], ENT_QUOTES) ?>', '<?= htmlspecialchars($roleLabel, ENT_QUOTES) ?>', '<?= htmlspecialchars($u['nomor_induk'], ENT_QUOTES) ?>')">
                                                     <i class="fas fa-pen text-[12px]"></i>
                                                 </button>
-                                                <button
-                                                    class="w-8 h-8 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center"
-                                                    title="Hapus">
-                                                    <i class="fas fa-trash text-[12px]"></i>
-                                                </button>
+                                                <!-- Hapus via form POST -->
+                                                <form method="POST" action="proses_hapus_user.php" style="display:inline">
+                                                    <input type="hidden" name="id_user" value="<?= $u['id_user'] ?>">
+                                                    <button type="submit"
+                                                        class="w-8 h-8 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center"
+                                                        title="Hapus"
+                                                        onclick="return confirm('Hapus user <?= htmlspecialchars($u['nama'], ENT_QUOTES) ?>?')">
+                                                        <i class="fas fa-trash text-[12px]"></i>
+                                                    </button>
+                                                </form>
                                             </div>
                                         </td>
                                     </tr>
@@ -350,7 +418,8 @@ $activePage = 'manajemen_user';
         }
 
         // ===== Edit User Modal =====
-        function openEditModal(nama, email, role, nomorInduk) {
+        function openEditModal(idUser, nama, email, role, nomorInduk) {
+            document.getElementById('editUserId').value = idUser;
             document.getElementById('editNama').value = nama;
             document.getElementById('editEmail').value = email;
             document.getElementById('editNomorInduk').value = nomorInduk;

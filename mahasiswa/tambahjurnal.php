@@ -1,7 +1,14 @@
 <?php
     session_start();
+    require_once '../config/db_connect.php';
+
+    if (!isset($_SESSION['id_user']) || strtolower($_SESSION['role_name']) !== 'mahasiswa') {
+        header('Location: ../index.php'); exit();
+    }
+
     $role = 'mahasiswa';
     $activePage = 'jurnal';
+    $userName = $_SESSION['nama'] ?? 'Mahasiswa';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -53,7 +60,23 @@
                         <p class="text-[14px] text-gray-400 mt-1">Isi detail kegiatan magang Anda hari ini.</p>
                     </div>
 
-                    <form action="#" method="POST" enctype="multipart/form-data" id="formJurnal">
+                    <?php if (isset($_GET['error'])): ?>
+                        <?php
+                        $errs = [
+                            'field_kosong'  => 'Harap isi semua field yang wajib diisi.',
+                            'file_besar'    => 'Ukuran file melebihi 2MB.',
+                            'file_format'   => 'Format file tidak didukung. Gunakan JPG/PNG.',
+                            'upload_gagal'  => 'Gagal mengupload file, coba lagi.',
+                            'db_error'      => 'Terjadi kesalahan pada database.',
+                        ];
+                        $errMsg = $errs[$_GET['error']] ?? 'Terjadi kesalahan.';
+                        ?>
+                        <div class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-[13px] font-medium flex items-center gap-2">
+                            <i class="fas fa-exclamation-circle text-red-500"></i> <?= htmlspecialchars($errMsg) ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <form action="../proses/jurnal_simpan.php" method="POST" enctype="multipart/form-data" id="formJurnal">
 
                         <!-- Tanggal Kegiatan -->
                         <div class="mb-6">

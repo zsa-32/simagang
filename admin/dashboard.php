@@ -1,7 +1,63 @@
 <?php
 session_start();
+require_once '../config/db_connect.php';
+
+if (!isset($_SESSION['id_user']) || strtolower($_SESSION['role_name']) !== 'admin') {
+    header('Location: ../index.php'); exit();
+}
+
 $role = 'admin';
 $activePage = 'dashboard';
+$today = date('Y-m-d');
+
+// Total mahasiswa
+$totalMhs = $conn->query("
+    SELECT COUNT(*) FROM Users u
+    JOIN Users_role ur ON u.id_user = ur.id_user
+    JOIN Roles r ON ur.id_role = r.id_role
+    WHERE LOWER(r.nama_role) = 'mahasiswa'
+")->fetchColumn();
+
+// Total dosen pembimbing
+$totalDosen = $conn->query("
+    SELECT COUNT(*) FROM Users u
+    JOIN Users_role ur ON u.id_user = ur.id_user
+    JOIN Roles r ON ur.id_role = r.id_role
+    WHERE LOWER(r.nama_role) = 'dosen pembimbing'
+")->fetchColumn();
+
+// Total perusahaan
+$totalPerusahaan = $conn->query("SELECT COUNT(*) FROM Company")->fetchColumn();
+
+// Magang selesai (tanggal_selesai <= hari ini)
+$totalSelesai = $conn->query("SELECT COUNT(*) FROM Internship_placement WHERE tanggal_selesai <= '$today'")->fetchColumn();
+
+// Jurnal menunggu persetujuan
+$jurnalPending = $conn->query("SELECT COUNT(*) FROM Daily_journal WHERE status = 'Menunggu'")->fetchColumn();
+
+// Mahasiswa belum presensi hari ini
+$stmtBelum = $conn->prepare("
+    SELECT COUNT(*) FROM Users u
+    JOIN Users_role ur ON u.id_user = ur.id_user
+    JOIN Roles r ON ur.id_role = r.id_role
+    WHERE LOWER(r.nama_role) = 'mahasiswa'
+    AND u.id_user NOT IN (SELECT id_user FROM Attendances WHERE tanggal = :today)
+");
+$stmtBelum->execute([':today' => $today]);
+$belumAbsen = $stmtBelum->fetchColumn();
+
+// Distribusi mahasiswa per perusahaan (untuk bar chart)
+$distrib = $conn->query("
+    SELECT c.nama_company, COUNT(ip.id_user) as jumlah
+    FROM Company c
+    LEFT JOIN Internship_placement ip ON c.id_company = ip.id_company
+    GROUP BY c.id_company, c.nama_company
+    ORDER BY jumlah DESC
+    LIMIT 6
+")->fetchAll();
+
+$chartLabels = json_encode(array_column($distrib, 'nama_company'));
+$chartData   = json_encode(array_column($distrib, 'jumlah'));
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -45,10 +101,8 @@ $activePage = 'dashboard';
                     <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-start justify-between">
                         <div>
                             <p class="text-[13px] text-gray-500 font-medium mb-1">Total Mahasiswa Magang</p>
-                            <p class="text-3xl font-bold text-gray-900">248</p>
-                            <p class="text-[12px] text-green-500 font-medium mt-1.5 flex items-center gap-1">
-                                <i class="fas fa-arrow-trend-up text-[11px]"></i> +12 dari bulan lalu
-                            </p>
+                            <p class="text-3xl font-bold text-gray-900"><?= $totalMhs ?></p>
+                            <p class="text-[12px] text-gray-400 font-medium mt-1.5">Terdaftar di sistem</p>
                         </div>
                         <div class="bg-blue-100 text-blue-600 w-11 h-11 rounded-xl flex items-center justify-center shrink-0">
                             <i class="fas fa-graduation-cap text-lg"></i>
@@ -58,10 +112,8 @@ $activePage = 'dashboard';
                     <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-start justify-between">
                         <div>
                             <p class="text-[13px] text-gray-500 font-medium mb-1">Dosen Pembimbing</p>
-                            <p class="text-3xl font-bold text-gray-900">32</p>
-                            <p class="text-[12px] text-green-500 font-medium mt-1.5 flex items-center gap-1">
-                                <i class="fas fa-arrow-trend-up text-[11px]"></i> +2 dari bulan lalu
-                            </p>
+                            <p class="text-3xl font-bold text-gray-900"><?= $totalDosen ?></p>
+                            <p class="text-[12px] text-gray-400 font-medium mt-1.5">Aktif membimbing</p>
                         </div>
                         <div class="bg-blue-100 text-blue-600 w-11 h-11 rounded-xl flex items-center justify-center shrink-0">
                             <i class="fas fa-chalkboard-teacher text-lg"></i>
@@ -71,10 +123,8 @@ $activePage = 'dashboard';
                     <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-start justify-between">
                         <div>
                             <p class="text-[13px] text-gray-500 font-medium mb-1">Perusahaan Mitra</p>
-                            <p class="text-3xl font-bold text-gray-900">45</p>
-                            <p class="text-[12px] text-green-500 font-medium mt-1.5 flex items-center gap-1">
-                                <i class="fas fa-arrow-trend-up text-[11px]"></i> +5 dari bulan lalu
-                            </p>
+                            <p class="text-3xl font-bold text-gray-900"><?= $totalPerusahaan ?></p>
+                            <p class="text-[12px] text-gray-400 font-medium mt-1.5">Tempat magang</p>
                         </div>
                         <div class="bg-blue-100 text-blue-600 w-11 h-11 rounded-xl flex items-center justify-center shrink-0">
                             <i class="fas fa-building text-lg"></i>
@@ -84,10 +134,8 @@ $activePage = 'dashboard';
                     <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-start justify-between">
                         <div>
                             <p class="text-[13px] text-gray-500 font-medium mb-1">Magang Selesai</p>
-                            <p class="text-3xl font-bold text-gray-900">198</p>
-                            <p class="text-[12px] text-green-500 font-medium mt-1.5 flex items-center gap-1">
-                                <i class="fas fa-arrow-trend-up text-[11px]"></i> 80% dari bulan lalu
-                            </p>
+                            <p class="text-3xl font-bold text-gray-900"><?= $totalSelesai ?></p>
+                            <p class="text-[12px] text-gray-400 font-medium mt-1.5">Telah menyelesaikan</p>
                         </div>
                         <div class="bg-blue-100 text-blue-600 w-11 h-11 rounded-xl flex items-center justify-center shrink-0">
                             <i class="fas fa-circle-check text-lg"></i>
@@ -168,15 +216,11 @@ $activePage = 'dashboard';
                         <div class="space-y-4">
                             <div class="flex items-start gap-3 p-3.5 bg-red-50 rounded-xl border border-red-100">
                                 <span class="w-2.5 h-2.5 rounded-full bg-red-500 mt-1 shrink-0"></span>
-                                <p class="text-[13px] text-gray-700">12 jurnal mahasiswa menunggu persetujuan PL</p>
-                            </div>
-                            <div class="flex items-start gap-3 p-3.5 bg-amber-50 rounded-xl border border-amber-100">
-                                <span class="w-2.5 h-2.5 rounded-full bg-amber-400 mt-1 shrink-0"></span>
-                                <p class="text-[13px] text-gray-700">5 dosen belum menginput nilai bimbingan</p>
+                                <p class="text-[13px] text-gray-700"><?= $jurnalPending ?> jurnal mahasiswa menunggu persetujuan</p>
                             </div>
                             <div class="flex items-start gap-3 p-3.5 bg-orange-50 rounded-xl border border-orange-100">
                                 <span class="w-2.5 h-2.5 rounded-full bg-orange-400 mt-1 shrink-0"></span>
-                                <p class="text-[13px] text-gray-700">3 mahasiswa belum presensi hari ini</p>
+                                <p class="text-[13px] text-gray-700"><?= $belumAbsen ?> mahasiswa belum presensi hari ini</p>
                             </div>
                         </div>
                     </div>
@@ -294,10 +338,10 @@ $activePage = 'dashboard';
         new Chart(barCtx, {
             type: 'bar',
             data: {
-                labels: ['PT Telkom', 'PT PLN', 'Gojek', 'Tokopedia', 'Bukalapak', 'Traveloka'],
+                labels: <?= $chartLabels ?>,
                 datasets: [{
                     label: 'Mahasiswa',
-                    data: [28, 22, 18, 15, 10, 9],
+                    data: <?= $chartData ?>,
                     backgroundColor: '#3b82f6',
                     hoverBackgroundColor: '#2563eb',
                     borderRadius: 4,

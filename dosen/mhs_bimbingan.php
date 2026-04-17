@@ -1,107 +1,89 @@
 <?php
     session_start();
+    require_once '../config/db_connect.php';
+
+    if (!isset($_SESSION['id_user']) || strtolower($_SESSION['role_name']) !== 'dosen pembimbing') {
+        header('Location: ../index.php'); exit();
+    }
+
     $role = 'dosen';
     $activePage = 'bimbingan';
+    $id_dosen = (int) $_SESSION['id_user'];
 
-    $students = [
-        [
-            'nama'        => 'Balmond',
-            'nim'         => '211134341',
-            'instansi'    => 'PT Telkom Indonesia',
-            'alamat'      => 'Jl. Japati No. 1, Bandung',
-            'pembimbing'  => 'Ir. Agus Setiawan',
-            'periode'     => '1 Jan 2026 – 30 Jun 2026',
-            'status'      => 'Aktif',
-            'telp'        => '0812-3456-7891',
-            'email'       => 'balmond@student.polije.ac.id',
-            'hadir'       => 85,
-            'izin'        => 3,
-            'tidakHadir'  => 1,
-            'catatan'     => '"Progres sangat baik, lanjutkan pengerjaan BAB IV."',
-            'badges'      => [['Hadir','green'],['Sudah Approve','green']],
-        ],
-        [
-            'nama'        => 'Lesley',
-            'nim'         => '20133432',
-            'instansi'    => 'CV Digital Kreatif',
-            'alamat'      => 'Jl. Soekarno-Hatta No. 45, Jember',
-            'pembimbing'  => 'Budi Hartono, S.T.',
-            'periode'     => '1 Jan 2026 – 30 Jun 2026',
-            'status'      => 'Aktif',
-            'telp'        => '0813-2233-4455',
-            'email'       => 'lesley@student.polije.ac.id',
-            'hadir'       => 78,
-            'izin'        => 5,
-            'tidakHadir'  => 2,
-            'catatan'     => '"Perlu meningkatkan konsistensi dalam pengumpulan jurnal harian."',
-            'badges'      => [['Hadir','green'],['Belum Review','orange']],
-        ],
-        [
-            'nama'        => 'Harley',
-            'nim'         => '22123232',
-            'instansi'    => 'PT Bank BRI',
-            'alamat'      => 'Jl. Veteran No. 12, Surabaya',
-            'pembimbing'  => 'Andi Nugroho, M.T.',
-            'periode'     => '1 Feb 2026 – 31 Jul 2026',
-            'status'      => 'Aktif',
-            'telp'        => '0852-9988-7766',
-            'email'       => 'harley@student.polije.ac.id',
-            'hadir'       => 60,
-            'izin'        => 2,
-            'tidakHadir'  => 4,
-            'catatan'     => '"Mohon lebih aktif dalam penyelesaian tugas yang diberikan pembimbing lapang."',
-            'badges'      => [['Belum Absen','gray'],['Belum Review','orange']],
-        ],
-        [
-            'nama'        => 'Budi Santoso',
-            'nim'         => '21140004',
-            'instansi'    => 'PT Astra International',
-            'alamat'      => 'Jl. Gaya Motor Raya No. 8, Jakarta',
-            'pembimbing'  => 'Siti Rahayu, S.Kom.',
-            'periode'     => '1 Jan 2026 – 30 Jun 2026',
-            'status'      => 'Aktif',
-            'telp'        => '0878-5544-3322',
-            'email'       => 'budi.santoso@student.polije.ac.id',
-            'hadir'       => 90,
-            'izin'        => 2,
-            'tidakHadir'  => 0,
-            'catatan'     => '"Kinerja sangat memuaskan, laporan akhir sudah siap untuk disidangkan."',
-            'badges'      => [['Izin','orange'],['Sudah Approve','green']],
-        ],
-        [
-            'nama'        => 'Joko',
-            'nim'         => '22130003',
-            'instansi'    => 'PT Tokopedia',
-            'alamat'      => 'Jl. Benyamin Sueb, Jakarta Utara',
-            'pembimbing'  => 'Rudi Santoso, M.Sc.',
-            'periode'     => '1 Feb 2026 – 31 Jul 2026',
-            'status'      => 'Aktif',
-            'telp'        => '0856-7788-9900',
-            'email'       => 'joko@student.polije.ac.id',
-            'hadir'       => 55,
-            'izin'        => 1,
-            'tidakHadir'  => 8,
-            'catatan'     => '"Tingkat kehadiran rendah. Segera hubungi mahasiswa untuk klarifikasi."',
-            'badges'      => [['Tidak Hadir','red'],['Revisi','red']],
-        ],
-        [
-            'nama'        => 'Meks Panda',
-            'nim'         => '22130043',
-            'instansi'    => 'PT Gojek Indonesia',
-            'alamat'      => 'Jl. Kemang Selatan VIII No. 1, Jakarta',
-            'pembimbing'  => 'Nina Dewi, S.T., M.T.',
-            'periode'     => '1 Jan 2026 – 30 Jun 2026',
-            'status'      => 'Aktif',
-            'telp'        => '0819-6677-8899',
-            'email'       => 'mekspanda@student.polije.ac.id',
-            'hadir'       => 82,
-            'izin'        => 3,
-            'tidakHadir'  => 1,
-            'catatan'     => '"Progres baik, perlu melengkapi dokumentasi teknis pada laporan."',
-            'badges'      => [['Hadir','green'],['Sudah Approve','green']],
-        ],
-    ];
+    // Ambil mahasiswa bimbingan beserta data lengkap
+    $stmt = $conn->prepare("
+        SELECT
+            u.id_user, u.nama, u.email,
+            p.nim, p.no_hp, p.prodi, p.dosen_pembimbing,
+            c.nama_company AS instansi,
+            c.alamat AS alamat,
+            ip.tanggal_mulai, ip.tanggal_selesai,
+            -- Hitung kehadiran
+            (SELECT COUNT(*) FROM Attendances a WHERE a.id_user = u.id_user AND a.keterangan = 'Hadir') AS jml_hadir,
+            (SELECT COUNT(*) FROM Attendances a WHERE a.id_user = u.id_user AND a.keterangan IN ('Izin','Sakit')) AS jml_izin,
+            (SELECT COUNT(*) FROM Attendances a WHERE a.id_user = u.id_user AND a.keterangan = 'Alpha') AS jml_alpha,
+            -- Catatan dari jurnal terakhir yang divalidasi
+            (SELECT dj.catatan_dosen FROM Daily_journal dj
+             WHERE dj.id_user = u.id_user AND dj.catatan_dosen IS NOT NULL
+             ORDER BY dj.tanggal DESC LIMIT 1) AS catatan_terakhir,
+            -- Status jurnal hari ini
+            (SELECT dj.status FROM Daily_journal dj
+             WHERE dj.id_user = u.id_user
+             ORDER BY dj.tanggal DESC LIMIT 1) AS status_jurnal,
+            -- Absen hari ini
+            (SELECT a.keterangan FROM Attendances a
+             WHERE a.id_user = u.id_user AND a.tanggal = CURDATE() LIMIT 1) AS absen_hari_ini
+        FROM Users u
+        JOIN Profile p ON u.id_user = p.id_user
+        LEFT JOIN Internship_placement ip ON u.id_user = ip.id_user
+        LEFT JOIN Company c ON ip.id_company = c.id_company
+        WHERE p.id_dosen_pembimbing = :id_dosen
+        ORDER BY u.nama ASC
+    ");
+    $stmt->execute([':id_dosen' => $id_dosen]);
+    $students = $stmt->fetchAll();
 
+    // Format untuk JS
+    $studentsJS = [];
+    foreach ($students as $s) {
+        $tglMulai   = $s['tanggal_mulai']   ? date('d M Y', strtotime($s['tanggal_mulai']))   : '-';
+        $tglSelesai = $s['tanggal_selesai'] ? date('d M Y', strtotime($s['tanggal_selesai'])) : '-';
+        $studentsJS[] = [
+            'nama'       => $s['nama'],
+            'nim'        => $s['nim'] ?? '-',
+            'instansi'   => $s['instansi'] ?? '-',
+            'alamat'     => $s['alamat'] ?? '-',
+            'pembimbing' => $s['dosen_pembimbing'] ?? '-',
+            'periode'    => ($tglMulai !== '-') ? "$tglMulai – $tglSelesai" : '-',
+            'status'     => 'Aktif',
+            'telp'       => $s['no_hp'] ?? '-',
+            'email'      => $s['email'],
+            'hadir'      => (int)$s['jml_hadir'],
+            'izin'       => (int)$s['jml_izin'],
+            'tidakHadir' => (int)$s['jml_alpha'],
+            'catatan'    => $s['catatan_terakhir'] ? '"' . $s['catatan_terakhir'] . '"' : '"Belum ada catatan bimbingan."',
+            'badges'     => _buildBadges($s),
+        ];
+    }
+
+    function _buildBadges(array $s): array {
+        $badges = [];
+        $absen = $s['absen_hari_ini'] ?? null;
+        if ($absen === 'Hadir')   $badges[] = ['Hadir', 'green'];
+        elseif ($absen === 'Izin') $badges[] = ['Izin', 'orange'];
+        elseif ($absen === 'Alpha') $badges[] = ['Tidak Hadir', 'red'];
+        else                        $badges[] = ['Belum Absen', 'gray'];
+
+        $jurnal = $s['status_jurnal'] ?? null;
+        if ($jurnal === 'Disetujui')      $badges[] = ['Sudah Approve', 'green'];
+        elseif ($jurnal === 'Ditolak')    $badges[] = ['Revisi', 'red'];
+        elseif ($jurnal === 'Menunggu')   $badges[] = ['Belum Review', 'orange'];
+        else                              $badges[] = ['Belum Review', 'orange'];
+        return $badges;
+    }
+
+    $totalMhs    = count($students);
+    $totalAktif  = $totalMhs; // semua diasumsikan aktif
     $badgeMap = [
         'green'  => 'bg-green-100 text-green-700',
         'orange' => 'bg-orange-100 text-orange-600',
@@ -109,6 +91,7 @@
         'gray'   => 'bg-gray-100 text-gray-500',
     ];
 ?>
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -192,7 +175,7 @@
                         </div>
                         <div>
                             <p class="text-[12px] text-gray-500 mb-0.5">Total Mahasiswa</p>
-                            <p class="text-3xl font-bold text-gray-900"><?= count($students) ?></p>
+                            <p class="text-3xl font-bold text-gray-900"><?= $totalMhs ?></p>
                         </div>
                     </div>
                     <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center gap-4">
@@ -201,7 +184,7 @@
                         </div>
                         <div>
                             <p class="text-[12px] text-gray-500 mb-0.5">Magang Aktif</p>
-                            <p class="text-3xl font-bold text-gray-900"><?= count($students) ?></p>
+                            <p class="text-3xl font-bold text-gray-900"><?= $totalAktif ?></p>
                         </div>
                     </div>
                     <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center gap-4">
@@ -218,9 +201,9 @@
                 <!-- Student Cards Grid -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="studentGrid">
 
-                    <?php foreach ($students as $idx => $s): ?>
+                    <?php foreach ($studentsJS as $idx => $s): ?>
                     <div class="student-card bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3 student-searchable"
-                         data-name="<?= strtolower($s['nama']) ?> <?= $s['nim'] ?> <?= strtolower($s['instansi']) ?>"
+                         data-name="<?= strtolower($s['nama']) ?> <?= strtolower($s['nim']) ?> <?= strtolower($s['instansi']) ?>"
                          onclick="openModal(<?= $idx ?>)">
 
                         <!-- Card Header -->
@@ -231,21 +214,21 @@
                                 </div>
                                 <div>
                                     <p class="font-bold text-gray-900 text-[15px]"><?= htmlspecialchars($s['nama']) ?></p>
-                                    <p class="text-[12px] text-gray-400"><?= $s['nim'] ?></p>
+                                    <p class="text-[12px] text-gray-400"><?= $s['nim'] ?? '-' ?></p>
                                 </div>
                             </div>
-                            <span class="text-[11px] font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full"><?= $s['status'] ?></span>
+                            <span class="text-[11px] font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">Aktif</span>
                         </div>
 
                         <!-- Info -->
                         <div class="space-y-1.5 text-[13px] text-gray-500">
                             <div class="flex items-start gap-2">
                                 <i class="fas fa-building mt-0.5 w-4 text-center text-gray-400 text-[12px]"></i>
-                                <span><?= htmlspecialchars($s['instansi']) ?></span>
+                                <span><?= htmlspecialchars($s['instansi'] ?? '-') ?></span>
                             </div>
                             <div class="flex items-start gap-2">
                                 <i class="fas fa-map-marker-alt mt-0.5 w-4 text-center text-gray-400 text-[12px]"></i>
-                                <span class="line-clamp-1"><?= htmlspecialchars($s['alamat']) ?></span>
+                                <span class="line-clamp-1"><?= htmlspecialchars($s['alamat'] ?? '-') ?></span>
                             </div>
                             <div class="flex items-start gap-2">
                                 <i class="fas fa-calendar-alt mt-0.5 w-4 text-center text-gray-400 text-[12px]"></i>
@@ -421,7 +404,7 @@
 
     <!-- Student data as JSON for JS -->
     <script>
-        const students = <?= json_encode($students, JSON_UNESCAPED_UNICODE) ?>;
+        const students = <?= json_encode($studentsJS, JSON_UNESCAPED_UNICODE) ?>;
 
         function openModal(idx) {
             const s = students[idx];

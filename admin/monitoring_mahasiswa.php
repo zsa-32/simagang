@@ -1,7 +1,60 @@
 <?php
 session_start();
+require_once '../config/db_connect.php';
+
+if (!isset($_SESSION['id_user']) || strtolower($_SESSION['role_name']) !== 'admin') {
+    header('Location: ../index.php'); exit();
+}
+
 $role = 'admin';
 $activePage = 'monitoring_mahasiswa';
+$today = date('Y-m-d');
+
+// Presensi semua mahasiswa hari ini
+$stmtP = $conn->prepare("
+    SELECT u.nama, p.nim,
+           c.nama_company AS perusahaan,
+           a.waktu_masuk, a.waktu_keluar, a.keterangan
+    FROM Users u
+    JOIN Profile p ON u.id_user = p.id_user
+    LEFT JOIN Internship_placement ip ON u.id_user = ip.id_user
+    LEFT JOIN Company c ON ip.id_company = c.id_company
+    LEFT JOIN Attendances a ON a.id_user = u.id_user AND a.tanggal = :today
+    JOIN Users_role ur ON u.id_user = ur.id_user
+    JOIN Roles r ON ur.id_role = r.id_role
+    WHERE LOWER(r.nama_role) = 'mahasiswa'
+    ORDER BY u.nama ASC
+");
+$stmtP->execute([':today' => $today]);
+$presensiList = $stmtP->fetchAll();
+
+// Jurnal semua mahasiswa
+$stmtJ = $conn->prepare("
+    SELECT u.nama, p.nim, dj.kegiatan, dj.tanggal, dj.status
+    FROM Daily_journal dj
+    JOIN Users u ON dj.id_user = u.id_user
+    JOIN Profile p ON u.id_user = p.id_user
+    ORDER BY dj.tanggal DESC
+    LIMIT 100
+");
+$stmtJ->execute();
+$jurnalList = $stmtJ->fetchAll();
+
+// Hitung stats
+$totalMhs          = count($presensiList);
+$jmlHadir          = count(array_filter($presensiList, fn($r) => $r['keterangan'] === 'Hadir'));
+$jmlTerlambat      = 0;
+$jmlTidakHadir     = count(array_filter($presensiList, fn($r) => $r['keterangan'] === 'Alpha'));
+$jmlJurnalDisetujui = count(array_filter($jurnalList, fn($j) => $j['status'] === 'Disetujui'));
+
+$statusColors = [
+    'Hadir'       => 'bg-green-100 text-green-700',
+    'Tidak Hadir' => 'bg-red-100 text-red-600',
+    'Alpha'       => 'bg-red-100 text-red-600',
+    'Terlambat'   => 'bg-amber-100 text-amber-600',
+    'Izin'        => 'bg-amber-100 text-amber-600',
+    'Sakit'       => 'bg-amber-100 text-amber-600',
+];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -52,23 +105,23 @@ $activePage = 'monitoring_mahasiswa';
                 <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
                     <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                         <p class="text-[12px] text-gray-500 mb-1">Total Mahasiswa</p>
-                        <p class="text-2xl font-bold text-gray-900">7</p>
+                        <p class="text-2xl font-bold text-gray-900"><?= $totalMhs ?></p>
                     </div>
                     <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                         <p class="text-[12px] text-gray-500 mb-1">Hadir</p>
-                        <p class="text-2xl font-bold text-green-500">5</p>
+                        <p class="text-2xl font-bold text-green-500"><?= $jmlHadir ?></p>
                     </div>
                     <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                         <p class="text-[12px] text-gray-500 mb-1">Terlambat</p>
-                        <p class="text-2xl font-bold text-amber-500">1</p>
+                        <p class="text-2xl font-bold text-amber-500"><?= $jmlTerlambat ?></p>
                     </div>
                     <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                         <p class="text-[12px] text-gray-500 mb-1">Tidak Hadir</p>
-                        <p class="text-2xl font-bold text-red-500">1</p>
+                        <p class="text-2xl font-bold text-red-500"><?= $jmlTidakHadir ?></p>
                     </div>
                     <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                         <p class="text-[12px] text-gray-500 mb-1">Jurnal Disetujui</p>
-                        <p class="text-2xl font-bold text-blue-600">3/7</p>
+                        <p class="text-2xl font-bold text-blue-600"><?= $jmlJurnalDisetujui ?>/<?= count($jurnalList) ?></p>
                     </div>
                 </div>
 
@@ -101,36 +154,27 @@ $activePage = 'monitoring_mahasiswa';
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-50">
-                                <?php
-                                $presensiData = [
-                                    ['nama' => 'Balmond', 'nim' => '21173431', 'perusahaan' => 'PT Telkom Indonesia',  'checkin' => '08:02', 'checkout' => '16:55', 'status' => 'Hadir'],
-                                    ['nama' => 'Lesley',  'nim' => '20193432', 'perusahaan' => 'CV Digital Kreatif',   'checkin' => '07:58', 'checkout' => '17:05', 'status' => 'Hadir'],
-                                    ['nama' => 'Harley',  'nim' => '22123532', 'perusahaan' => 'PT Bank BRI',          'checkin' => '08:15', 'checkout' => '-',      'status' => 'Hadir'],
-                                    ['nama' => 'Budi Santoso', 'nim' => '21140024', 'perusahaan' => 'PT Astra International', 'checkin' => '-', 'checkout' => '-',   'status' => 'Tidak Hadir'],
-                                    ['nama' => 'Joko',    'nim' => '21130003', 'perusahaan' => 'PT Tokopedia',         'checkin' => '08:05', 'checkout' => '16:30', 'status' => 'Hadir'],
-                                    ['nama' => 'Meks',    'nim' => '22130043', 'perusahaan' => 'PT Gojek Indonesia',   'checkin' => '09:10', 'checkout' => '-',      'status' => 'Terlambat'],
-                                    ['nama' => 'Nana',    'nim' => '21130043', 'perusahaan' => 'PT Bukalapak',         'checkin' => '07:50', 'checkout' => '17:00', 'status' => 'Hadir'],
-                                ];
-                                $statusColors = [
-                                    'Hadir'       => 'bg-green-100 text-green-700',
-                                    'Tidak Hadir' => 'bg-red-100 text-red-600',
-                                    'Terlambat'   => 'bg-amber-100 text-amber-600',
-                                ];
-                                foreach ($presensiData as $d):
+                                <?php if (empty($presensiList)): ?>
+                                    <tr><td colspan="5" class="px-6 py-10 text-center text-gray-400"><i class="fas fa-users text-3xl mb-2 block"></i>Belum ada data presensi.</td></tr>
+                                <?php else: ?>
+                                <?php foreach ($presensiList as $d):
+                                    $ket = $d['keterangan'] ?? 'Belum Hadir';
+                                    $colorClass = $statusColors[$ket] ?? 'bg-gray-100 text-gray-500';
                                 ?>
                                 <tr class="hover:bg-gray-50 transition-colors mhs-row" data-search="<?= strtolower($d['nama'] . ' ' . $d['nim']) ?>">
                                     <td class="px-6 py-4">
                                         <p class="font-semibold text-gray-800 text-[14px]"><?= htmlspecialchars($d['nama']) ?></p>
                                         <p class="text-[12px] text-gray-400"><?= $d['nim'] ?></p>
                                     </td>
-                                    <td class="px-6 py-4 text-[13px] text-gray-600"><?= htmlspecialchars($d['perusahaan']) ?></td>
-                                    <td class="px-6 py-4 text-[13px] text-gray-700 font-medium"><?= $d['checkin'] ?></td>
-                                    <td class="px-6 py-4 text-[13px] text-gray-700 font-medium"><?= $d['checkout'] ?></td>
+                                    <td class="px-6 py-4 text-[13px] text-gray-600"><?= htmlspecialchars($d['perusahaan'] ?? '-') ?></td>
+                                    <td class="px-6 py-4 text-[13px] text-gray-700 font-medium"><?= $d['waktu_masuk'] ?? '-' ?></td>
+                                    <td class="px-6 py-4 text-[13px] text-gray-700 font-medium"><?= $d['waktu_keluar'] ?? '-' ?></td>
                                     <td class="px-6 py-4">
-                                        <span class="px-3 py-1 rounded-full text-[12px] font-semibold <?= $statusColors[$d['status']] ?>"><?= $d['status'] ?></span>
+                                        <span class="px-3 py-1 rounded-full text-[12px] font-semibold <?= $colorClass ?>"><?= htmlspecialchars($ket) ?></span>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -147,34 +191,30 @@ $activePage = 'monitoring_mahasiswa';
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-50">
+                                <?php if (empty($jurnalList)): ?>
+                                    <tr><td colspan="4" class="px-6 py-10 text-center text-gray-400"><i class="fas fa-book text-3xl mb-2 block"></i>Belum ada jurnal.</td></tr>
+                                <?php else: ?>
                                 <?php
-                                $jurnalData = [
-                                    ['nama' => 'Balmond', 'nim' => '21173431', 'judul' => 'Konfigurasi Jaringan Server', 'tanggal' => '04 Mar 2026', 'status' => 'Disetujui'],
-                                    ['nama' => 'Lesley',  'nim' => '20193432', 'judul' => 'Desain UI Dashboard Marketing', 'tanggal' => '04 Mar 2026', 'status' => 'Disetujui'],
-                                    ['nama' => 'Harley',  'nim' => '22123532', 'judul' => 'Analisis Keamanan Sistem Bank', 'tanggal' => '04 Mar 2026', 'status' => 'Menunggu'],
-                                    ['nama' => 'Joko',    'nim' => '21130003', 'judul' => 'Pengembangan API E-Commerce', 'tanggal' => '04 Mar 2026', 'status' => 'Disetujui'],
-                                    ['nama' => 'Meks',    'nim' => '22130043', 'judul' => 'Testing Fitur Ride-Hailing', 'tanggal' => '04 Mar 2026', 'status' => 'Menunggu'],
-                                    ['nama' => 'Nana',    'nim' => '21130043', 'judul' => 'Manajemen Database Penjual', 'tanggal' => '04 Mar 2026', 'status' => 'Menunggu'],
-                                ];
                                 $jurnalColors = [
                                     'Disetujui' => 'bg-green-100 text-green-700',
                                     'Menunggu'  => 'bg-amber-100 text-amber-600',
                                     'Ditolak'   => 'bg-red-100 text-red-600',
                                 ];
-                                foreach ($jurnalData as $j):
+                                foreach ($jurnalList as $j):
                                 ?>
                                 <tr class="hover:bg-gray-50 transition-colors">
                                     <td class="px-6 py-4">
                                         <p class="font-semibold text-gray-800 text-[14px]"><?= htmlspecialchars($j['nama']) ?></p>
                                         <p class="text-[12px] text-gray-400"><?= $j['nim'] ?></p>
                                     </td>
-                                    <td class="px-6 py-4 text-[13px] text-gray-700"><?= htmlspecialchars($j['judul']) ?></td>
-                                    <td class="px-6 py-4 text-[13px] text-gray-500"><?= $j['tanggal'] ?></td>
+                                    <td class="px-6 py-4 text-[13px] text-gray-700"><?= htmlspecialchars(explode("\n", $j['kegiatan'])[0]) ?></td>
+                                    <td class="px-6 py-4 text-[13px] text-gray-500"><?= date('d M Y', strtotime($j['tanggal'])) ?></td>
                                     <td class="px-6 py-4">
-                                        <span class="px-3 py-1 rounded-full text-[12px] font-semibold <?= $jurnalColors[$j['status']] ?>"><?= $j['status'] ?></span>
+                                        <span class="px-3 py-1 rounded-full text-[12px] font-semibold <?= $jurnalColors[$j['status']] ?? 'bg-gray-100 text-gray-500' ?>"><?= $j['status'] ?></span>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>

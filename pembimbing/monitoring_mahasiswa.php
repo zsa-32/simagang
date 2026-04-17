@@ -1,7 +1,61 @@
 <?php
 session_start();
+require_once '../config/db_connect.php';
+
+if (!isset($_SESSION['id_user']) || strtolower($_SESSION['role_name']) !== 'pembimbing lapang') {
+    header('Location: ../index.php'); exit();
+}
+
 $role = 'pembimbing';
 $activePage = 'monitoring_mahasiswa';
+$id_user = (int) $_SESSION['id_user'];
+$today = date('Y-m-d');
+
+// Ambil nama perusahaan pembimbing
+$stmtPb = $conn->prepare("SELECT nama_perusahaan FROM Profile WHERE id_user = :id LIMIT 1");
+$stmtPb->execute([':id' => $id_user]);
+$pbData = $stmtPb->fetch();
+$namaPerusahaan = $pbData['nama_perusahaan'] ?? null;
+
+// Presensi mahasiswa hari ini di perusahaan yang sama
+$stmtP = $conn->prepare("
+    SELECT u.nama, p.nim,
+           c.nama_company AS perusahaan,
+           u2.nama AS nama_dosen,
+           a.waktu_masuk, a.waktu_keluar, a.keterangan
+    FROM Users u
+    JOIN Profile p ON u.id_user = p.id_user
+    LEFT JOIN Internship_placement ip ON u.id_user = ip.id_user
+    LEFT JOIN Company c ON ip.id_company = c.id_company
+    LEFT JOIN Users u2 ON p.id_dosen_pembimbing = u2.id_user
+    LEFT JOIN Attendances a ON a.id_user = u.id_user AND a.tanggal = :today
+    WHERE c.nama_company = :perusahaan
+    AND u.id_user != :id_pb
+    ORDER BY u.nama ASC
+");
+$stmtP->execute([':today' => $today, ':perusahaan' => $namaPerusahaan, ':id_pb' => $id_user]);
+$presensiList = $stmtP->fetchAll();
+
+// Jurnal mahasiswa
+$stmtJ = $conn->prepare("
+    SELECT u.nama, p.nim, dj.kegiatan, dj.tanggal, dj.status
+    FROM Daily_journal dj
+    JOIN Users u ON dj.id_user = u.id_user
+    JOIN Profile p ON u.id_user = p.id_user
+    LEFT JOIN Internship_placement ip ON u.id_user = ip.id_user
+    LEFT JOIN Company c ON ip.id_company = c.id_company
+    WHERE c.nama_company = :perusahaan AND u.id_user != :id_pb
+    ORDER BY dj.tanggal DESC
+");
+$stmtJ->execute([':perusahaan' => $namaPerusahaan, ':id_pb' => $id_user]);
+$jurnalList = $stmtJ->fetchAll();
+
+// Hitung stats
+$totalMhs    = count($presensiList);
+$jmlHadir    = count(array_filter($presensiList, fn($r) => $r['keterangan'] === 'Hadir'));
+$jmlTerlambat = 0; // perlu definisi kriteria terlambat jika ada
+$jmlTidakHadir = count(array_filter($presensiList, fn($r) => $r['keterangan'] === 'Alpha' || is_null($r['keterangan'])));
+$jmlJurnalDisetujui = count(array_filter($jurnalList, fn($j) => $j['status'] === 'Disetujui'));
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -52,23 +106,23 @@ $activePage = 'monitoring_mahasiswa';
                     <div class="grid grid-cols-2 sm:grid-cols-5 gap-4">
                         <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
                             <p class="text-[12px] text-gray-500 font-medium mb-1">Total Mahasiswa</p>
-                            <p class="text-2xl font-bold text-gray-900">7</p>
+                            <p class="text-2xl font-bold text-gray-900"><?= $totalMhs ?></p>
                         </div>
                         <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
                             <p class="text-[12px] text-green-600 font-medium mb-1">Hadir</p>
-                            <p class="text-2xl font-bold text-gray-900">4</p>
+                            <p class="text-2xl font-bold text-gray-900"><?= $jmlHadir ?></p>
                         </div>
                         <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
                             <p class="text-[12px] text-amber-500 font-medium mb-1">Terlambat</p>
-                            <p class="text-2xl font-bold text-gray-900">1</p>
+                            <p class="text-2xl font-bold text-gray-900"><?= $jmlTerlambat ?></p>
                         </div>
                         <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
                             <p class="text-[12px] text-red-500 font-medium mb-1">Tidak Hadir</p>
-                            <p class="text-2xl font-bold text-gray-900">1</p>
+                            <p class="text-2xl font-bold text-gray-900"><?= $jmlTidakHadir ?></p>
                         </div>
                         <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
                             <p class="text-[12px] text-blue-600 font-medium mb-1">Jurnal Disetujui</p>
-                            <p class="text-2xl font-bold text-gray-900">3/7</p>
+                            <p class="text-2xl font-bold text-gray-900"><?= $jmlJurnalDisetujui ?>/<?= count($jurnalList) ?></p>
                         </div>
                     </div>
                 </div>
@@ -109,32 +163,26 @@ $activePage = 'monitoring_mahasiswa';
                                 </tr>
                             </thead>
                             <tbody id="presensiTableBody" class="divide-y divide-gray-50">
-                                <?php
-                                $mahasiswa = [
-                                    ['nama' => 'Balmond',      'nim' => '21173431', 'perusahaan' => 'PT Telkom Indonesia',   'status' => 'Hadir',        'dosen' => 'Dr. Budi Santoso',  'waktu' => '08:15'],
-                                    ['nama' => 'Lesley',       'nim' => '20193432', 'perusahaan' => 'CV Digital Kreatif',    'status' => 'Hadir',        'dosen' => 'Dr. Siti Rahayu',   'waktu' => '08:05'],
-                                    ['nama' => 'Harley',       'nim' => '22123532', 'perusahaan' => 'PT Bank BRI',           'status' => 'Terlambat',    'dosen' => 'Ir. Made Wirawan',  'waktu' => '08:35'],
-                                    ['nama' => 'Budi Santoso', 'nim' => '21140024', 'perusahaan' => 'PT Astra International','status' => 'Belum presensi','dosen' => 'Dr. Budi Santoso', 'waktu' => '-'],
-                                    ['nama' => 'Joko',         'nim' => '21130003', 'perusahaan' => 'PT Tokopedia',          'status' => 'Tidak Hadir',  'dosen' => 'Dr. Siti Rahayu',   'waktu' => '-'],
-                                    ['nama' => 'Meks',         'nim' => '22130043', 'perusahaan' => 'PT Gojek Indonesia',    'status' => 'Hadir',        'dosen' => 'Ir. Made Wirawan',  'waktu' => '08:10'],
-                                    ['nama' => 'Nana',         'nim' => '21130043', 'perusahaan' => 'PT Bukalapak',          'status' => 'Hadir',        'dosen' => 'Dr. Budi Santoso',  'waktu' => '08:00'],
-                                ];
-                                foreach ($mahasiswa as $mhs):
-                                    $statusConfig = match($mhs['status']) {
-                                        'Hadir'         => ['dot' => 'bg-green-500',  'text' => 'text-green-600', 'label' => 'Hadir'],
-                                        'Terlambat'     => ['dot' => 'bg-amber-400',  'text' => 'text-amber-600', 'label' => 'Terlambat'],
-                                        'Tidak Hadir'   => ['dot' => 'bg-red-500',    'text' => 'text-red-600',   'label' => 'Tidak Hadir'],
-                                        default         => ['dot' => 'bg-gray-300',   'text' => 'text-gray-400',  'label' => 'Belum presensi'],
+                                <?php if (empty($presensiList)): ?>
+                                    <tr><td colspan="5" class="px-6 py-10 text-center text-gray-400"><i class="fas fa-users text-3xl mb-2 block"></i>Belum ada data presensi mahasiswa.</td></tr>
+                                <?php else: ?>
+                                <?php foreach ($presensiList as $mhs):
+                                    $ket = $mhs['keterangan'] ?? null;
+                                    $statusConfig = match($ket) {
+                                        'Hadir'       => ['dot' => 'bg-green-500',  'text' => 'text-green-600', 'label' => 'Hadir'],
+                                        'Izin','Sakit'=> ['dot' => 'bg-amber-400',  'text' => 'text-amber-600', 'label' => 'Izin/Sakit'],
+                                        'Alpha'       => ['dot' => 'bg-red-500',    'text' => 'text-red-600',   'label' => 'Tidak Hadir'],
+                                        default       => ['dot' => 'bg-gray-300',   'text' => 'text-gray-400',  'label' => 'Belum presensi'],
                                     };
                                 ?>
                                     <tr class="hover:bg-gray-50 transition-colors data-row"
                                         data-search="<?= strtolower($mhs['nama'] . ' ' . $mhs['nim']) ?>">
                                         <td class="px-6 py-4">
                                             <p class="font-semibold text-gray-800 text-[14px]"><?= htmlspecialchars($mhs['nama']) ?></p>
-                                            <p class="text-[12px] text-gray-400"><?= $mhs['nim'] ?> &middot; <?= htmlspecialchars($mhs['perusahaan']) ?></p>
+                                            <p class="text-[12px] text-gray-400"><?= $mhs['nim'] ?> &middot; <?= htmlspecialchars($mhs['perusahaan'] ?? '-') ?></p>
                                         </td>
                                         <td class="px-6 py-4">
-                                            <?php if ($mhs['status'] === 'Belum presensi'): ?>
+                                            <?php if (!$ket): ?>
                                                 <span class="text-[13px] text-gray-400 italic">Belum presensi</span>
                                             <?php else: ?>
                                                 <span class="flex items-center gap-1.5 text-[13px] font-semibold <?= $statusConfig['text'] ?>">
@@ -143,8 +191,8 @@ $activePage = 'monitoring_mahasiswa';
                                                 </span>
                                             <?php endif; ?>
                                         </td>
-                                        <td class="px-6 py-4 text-[13px] text-gray-600"><?= htmlspecialchars($mhs['dosen']) ?></td>
-                                        <td class="px-6 py-4 text-[13px] text-gray-600 font-medium"><?= $mhs['waktu'] ?></td>
+                                        <td class="px-6 py-4 text-[13px] text-gray-600"><?= htmlspecialchars($mhs['nama_dosen'] ?? '-') ?></td>
+                                        <td class="px-6 py-4 text-[13px] text-gray-600 font-medium"><?= $mhs['waktu_masuk'] ?? '-' ?></td>
                                         <td class="px-6 py-4">
                                             <button class="flex items-center gap-1.5 px-3 py-1.5 border border-blue-200 text-blue-600 rounded-lg text-[12px] font-medium hover:bg-blue-50 transition-colors">
                                                 <i class="fas fa-eye text-[11px]"></i> Lihat
@@ -152,6 +200,7 @@ $activePage = 'monitoring_mahasiswa';
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -169,20 +218,15 @@ $activePage = 'monitoring_mahasiswa';
                                 </tr>
                             </thead>
                             <tbody id="jurnalTableBody" class="divide-y divide-gray-50">
-                                <?php
-                                $jurnal = [
-                                    ['nama' => 'Balmond',      'nim' => '21173431', 'judul' => 'Setup Environment & Onboarding',     'tanggal' => '04 Mar 2026', 'status' => 'Disetujui'],
-                                    ['nama' => 'Lesley',       'nim' => '20193432', 'judul' => 'Belajar Framework Laravel',           'tanggal' => '04 Mar 2026', 'status' => 'Disetujui'],
-                                    ['nama' => 'Harley',       'nim' => '22123532', 'judul' => 'Meeting dengan tim backend',          'tanggal' => '04 Mar 2026', 'status' => 'Menunggu'],
-                                    ['nama' => 'Budi Santoso', 'nim' => '21140024', 'judul' => 'Desain UI halaman utama',            'tanggal' => '04 Mar 2026', 'status' => 'Menunggu'],
-                                    ['nama' => 'Joko',         'nim' => '21130003', 'judul' => 'Integrasi API pembayaran',           'tanggal' => '04 Mar 2026', 'status' => 'Menunggu'],
-                                    ['nama' => 'Meks',         'nim' => '22130043', 'judul' => 'Debugging fitur cart',               'tanggal' => '04 Mar 2026', 'status' => 'Disetujui'],
-                                    ['nama' => 'Nana',         'nim' => '21130043', 'judul' => 'Review code dengan mentor',          'tanggal' => '04 Mar 2026', 'status' => 'Menunggu'],
-                                ];
-                                foreach ($jurnal as $j):
-                                    $jBadge = $j['status'] === 'Disetujui'
-                                        ? 'bg-green-100 text-green-700'
-                                        : 'bg-amber-100 text-amber-700';
+                                <?php if (empty($jurnalList)): ?>
+                                    <tr><td colspan="5" class="px-6 py-10 text-center text-gray-400"><i class="fas fa-book text-3xl mb-2 block"></i>Belum ada jurnal dari mahasiswa.</td></tr>
+                                <?php else: ?>
+                                <?php foreach ($jurnalList as $j):
+                                    $jBadge = match($j['status']) {
+                                        'Disetujui' => 'bg-green-100 text-green-700',
+                                        'Ditolak'   => 'bg-red-100 text-red-600',
+                                        default     => 'bg-amber-100 text-amber-700',
+                                    };
                                 ?>
                                     <tr class="hover:bg-gray-50 transition-colors jurnal-row"
                                         data-search="<?= strtolower($j['nama'] . ' ' . $j['nim']) ?>">
@@ -190,12 +234,10 @@ $activePage = 'monitoring_mahasiswa';
                                             <p class="font-semibold text-gray-800 text-[14px]"><?= htmlspecialchars($j['nama']) ?></p>
                                             <p class="text-[12px] text-gray-400"><?= $j['nim'] ?></p>
                                         </td>
-                                        <td class="px-6 py-4 text-[13px] text-gray-700"><?= htmlspecialchars($j['judul']) ?></td>
-                                        <td class="px-6 py-4 text-[13px] text-gray-500"><?= $j['tanggal'] ?></td>
+                                        <td class="px-6 py-4 text-[13px] text-gray-700"><?= htmlspecialchars(explode("\n", $j['kegiatan'])[0]) ?></td>
+                                        <td class="px-6 py-4 text-[13px] text-gray-500"><?= date('d M Y', strtotime($j['tanggal'])) ?></td>
                                         <td class="px-6 py-4">
-                                            <span class="px-2.5 py-1 rounded-lg text-[12px] font-semibold <?= $jBadge ?>">
-                                                <?= $j['status'] ?>
-                                            </span>
+                                            <span class="px-2.5 py-1 rounded-lg text-[12px] font-semibold <?= $jBadge ?>"><?= $j['status'] ?></span>
                                         </td>
                                         <td class="px-6 py-4">
                                             <button class="flex items-center gap-1.5 px-3 py-1.5 border border-blue-200 text-blue-600 rounded-lg text-[12px] font-medium hover:bg-blue-50 transition-colors">
@@ -204,6 +246,7 @@ $activePage = 'monitoring_mahasiswa';
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>

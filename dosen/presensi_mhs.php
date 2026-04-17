@@ -1,20 +1,63 @@
 <?php
     session_start();
+    require_once '../config/db_connect.php';
+
+    if (!isset($_SESSION['id_user']) || strtolower($_SESSION['role_name']) !== 'dosen pembimbing') {
+        header('Location: ../index.php'); exit();
+    }
+
     $role = 'dosen';
     $activePage = 'presensi';
+    $id_dosen = (int) $_SESSION['id_user'];
 
     // Date navigation
     $tanggal = isset($_GET['tanggal']) ? $_GET['tanggal'] : date('Y-m-d');
-    $dateObj = new DateTime($tanggal);
+    $dateObj  = new DateTime($tanggal);
     $prevDate = (clone $dateObj)->modify('-1 day')->format('Y-m-d');
     $nextDate = (clone $dateObj)->modify('+1 day')->format('Y-m-d');
 
     // Indonesian days & months
     $days   = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
     $months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-    $dayName   = $days[(int)$dateObj->format('w')];
-    $monthName = $months[(int)$dateObj->format('n') - 1];
+    $dayName    = $days[(int)$dateObj->format('w')];
+    $monthName  = $months[(int)$dateObj->format('n') - 1];
     $displayDate = $dayName . ', ' . $dateObj->format('j') . ' ' . $monthName . ' ' . $dateObj->format('Y');
+
+    // Ambil semua mahasiswa bimbingan + data absensi pada tanggal terpilih
+    $stmt = $conn->prepare("
+        SELECT
+            u.nama, p.nim,
+            c.nama_company AS instansi,
+            a.waktu_masuk, a.waktu_keluar,
+            a.keterangan, a.status AS status_absen
+        FROM Users u
+        JOIN Profile p ON u.id_user = p.id_user
+        LEFT JOIN Internship_placement ip ON u.id_user = ip.id_user
+        LEFT JOIN Company c ON ip.id_company = c.id_company
+        LEFT JOIN Attendances a ON a.id_user = u.id_user AND a.tanggal = :tgl
+        WHERE p.id_dosen_pembimbing = :id_dosen
+        ORDER BY u.nama ASC
+    ");
+    $stmt->execute([':tgl' => $tanggal, ':id_dosen' => $id_dosen]);
+    $presences = $stmt->fetchAll();
+
+    // Hitung stats
+    $jmlHadir  = 0; $jmlIzin = 0; $jmlAlpha = 0; $jmlBelum = 0;
+    foreach ($presences as $p) {
+        $ket = $p['keterangan'] ?? null;
+        if ($ket === 'Hadir')                       $jmlHadir++;
+        elseif (in_array($ket, ['Izin','Sakit']))   $jmlIzin++;
+        elseif ($ket === 'Alpha')                   $jmlAlpha++;
+        else                                        $jmlBelum++;
+    }
+
+    $statusConfig = [
+        'Hadir'  => ['icon'=>'fa-check-circle',   'class'=>'text-green-600 bg-green-50',   'text'=>'Hadir'],
+        'Izin'   => ['icon'=>'fa-clock',           'class'=>'text-orange-500 bg-orange-50', 'text'=>'Izin'],
+        'Sakit'  => ['icon'=>'fa-clock',           'class'=>'text-orange-500 bg-orange-50', 'text'=>'Sakit'],
+        'Alpha'  => ['icon'=>'fa-times-circle',    'class'=>'text-red-500 bg-red-50',       'text'=>'Tidak Hadir'],
+        null     => ['icon'=>'fa-question-circle', 'class'=>'text-gray-400 bg-gray-50',     'text'=>'Belum Absen'],
+    ];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -96,7 +139,7 @@
                         </div>
                         <div>
                             <p class="text-[12px] text-gray-500">Hadir</p>
-                            <p class="text-2xl font-bold text-gray-900">4</p>
+                            <p class="text-2xl font-bold text-gray-900"><?= $jmlHadir ?></p>
                         </div>
                     </div>
                     <!-- Izin -->
@@ -105,8 +148,8 @@
                             <i class="fas fa-clock text-orange-400 text-[18px]"></i>
                         </div>
                         <div>
-                            <p class="text-[12px] text-gray-500">Izin</p>
-                            <p class="text-2xl font-bold text-gray-900">1</p>
+                            <p class="text-[12px] text-gray-500">Izin / Sakit</p>
+                            <p class="text-2xl font-bold text-gray-900"><?= $jmlIzin ?></p>
                         </div>
                     </div>
                     <!-- Tidak Hadir -->
@@ -116,7 +159,7 @@
                         </div>
                         <div>
                             <p class="text-[12px] text-gray-500">Tidak Hadir</p>
-                            <p class="text-2xl font-bold text-gray-900">1</p>
+                            <p class="text-2xl font-bold text-gray-900"><?= $jmlAlpha ?></p>
                         </div>
                     </div>
                     <!-- Belum Absen -->
@@ -126,7 +169,7 @@
                         </div>
                         <div>
                             <p class="text-[12px] text-gray-500">Belum Absen</p>
-                            <p class="text-2xl font-bold text-gray-900">1</p>
+                            <p class="text-2xl font-bold text-gray-900"><?= $jmlBelum ?></p>
                         </div>
                     </div>
                 </div>
@@ -145,28 +188,19 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
-                                <?php
-                                $presences = [
-                                    ['nama'=>'Balmond',    'nim'=>'21134341','instansi'=>'PT Telkom Indonesia', 'status'=>'Hadir',       'masuk'=>'07:45','keluar'=>'16:30','ket'=>'-'],
-                                    ['nama'=>'Lesley',     'nim'=>'20133432','instansi'=>'CV Digital Kreatif',  'status'=>'Hadir',       'masuk'=>'08:00','keluar'=>'16:15','ket'=>'-'],
-                                    ['nama'=>'Harley',     'nim'=>'22123232','instansi'=>'PT Bank BRI',         'status'=>'Belum Absen', 'masuk'=>'-',    'keluar'=>'-',   'ket'=>'-'],
-                                    ['nama'=>'Budi Santoso','nim'=>'21140004','instansi'=>'PT Astra International','status'=>'Izin',     'masuk'=>'-',    'keluar'=>'-',   'ket'=>'Sakit (Surat Dokter)'],
-                                    ['nama'=>'Joko',       'nim'=>'22130003','instansi'=>'PT Tokopedia',        'status'=>'Tidak Hadir', 'masuk'=>'-',    'keluar'=>'-',   'ket'=>'Tanpa keterangan'],
-                                    ['nama'=>'Meks Panda', 'nim'=>'22130043','instansi'=>'PT Gojek Indonesia',  'status'=>'Hadir',       'masuk'=>'07:50','keluar'=>'16:45','ket'=>'-'],
-                                    ['nama'=>'Nana',       'nim'=>'2213663', 'instansi'=>'PT Bukalapak',        'status'=>'Hadir',       'masuk'=>'07:55','keluar'=>'16:20','ket'=>'-'],
-                                ];
-
-                                $statusConfig = [
-                                    'Hadir'       => ['icon'=>'fa-check-circle',   'class'=>'text-green-600 bg-green-50',  'text'=>'text-green-600'],
-                                    'Izin'        => ['icon'=>'fa-clock',          'class'=>'text-orange-500 bg-orange-50','text'=>'text-orange-500'],
-                                    'Tidak Hadir' => ['icon'=>'fa-times-circle',   'class'=>'text-red-500 bg-red-50',      'text'=>'text-red-500'],
-                                    'Belum Absen' => ['icon'=>'fa-question-circle','class'=>'text-gray-400 bg-gray-50',    'text'=>'text-gray-400'],
-                                ];
-
-                                foreach ($presences as $p):
-                                    $cfg = $statusConfig[$p['status']] ?? $statusConfig['Belum Absen'];
+                                <?php if (empty($presences)): ?>
+                                    <tr>
+                                        <td colspan="5" class="px-6 py-12 text-center text-gray-400">
+                                            <i class="fas fa-users text-3xl mb-3 block"></i>
+                                            Tidak ada mahasiswa bimbingan untuk ditampilkan.
+                                        </td>
+                                    </tr>
+                                <?php else: ?>
+                                <?php foreach ($presences as $p):
+                                    $ket = $p['keterangan'] ?? null;
+                                    $cfg = $statusConfig[$ket] ?? $statusConfig[null];
                                 ?>
-                                <tr class="presence-row transition-colors">
+                                <tr class="presence-row transition-colors" data-search="<?= strtolower($p['nama'] . ' ' . $p['nim']) ?>">
                                     <td class="px-6 py-4">
                                         <div class="flex items-center gap-3">
                                             <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-white font-semibold text-[13px] shrink-0">
@@ -174,23 +208,26 @@
                                             </div>
                                             <div>
                                                 <p class="font-semibold text-gray-800"><?= htmlspecialchars($p['nama']) ?></p>
-                                                <p class="text-[12px] text-gray-400"><?= $p['nim'] ?> · <?= htmlspecialchars($p['instansi']) ?></p>
+                                                <p class="text-[12px] text-gray-400"><?= htmlspecialchars($p['nim'] ?? '-') ?> · <?= htmlspecialchars($p['instansi'] ?? '-') ?></p>
                                             </div>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4">
                                         <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold <?= $cfg['class'] ?>">
                                             <i class="fas <?= $cfg['icon'] ?> text-[11px]"></i>
-                                            <?= $p['status'] ?>
+                                            <?= $cfg['text'] ?>
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 text-gray-700 font-medium"><?= $p['masuk'] ?></td>
-                                    <td class="px-6 py-4 text-gray-700 font-medium"><?= $p['keluar'] ?></td>
+                                    <td class="px-6 py-4 text-gray-700 font-medium"><?= $p['waktu_masuk'] ?? '-' ?></td>
+                                    <td class="px-6 py-4 text-gray-700 font-medium"><?= $p['waktu_keluar'] ?? '-' ?></td>
                                     <td class="px-6 py-4 text-gray-500 text-[13px]">
-                                        <?= $p['ket'] === '-' ? '<span class="text-gray-300">-</span>' : htmlspecialchars($p['ket']) ?>
+                                        <?= !empty($p['keterangan']) && $p['keterangan'] !== 'Hadir'
+                                            ? htmlspecialchars($p['keterangan'])
+                                            : '<span class="text-gray-300">-</span>' ?>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>

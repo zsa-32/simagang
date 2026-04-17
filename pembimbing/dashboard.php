@@ -1,7 +1,31 @@
 <?php
 session_start();
+require_once '../config/db_connect.php';
+
+// Session Guard
+if (!isset($_SESSION['id_user']) || strtolower($_SESSION['role_name']) !== 'pembimbing lapang') {
+    header('Location: ../index.php');
+    exit();
+}
+
 $role = 'pembimbing';
 $activePage = 'dashboard';
+
+// Ambil data stats dari database
+$today = date('Y-m-d');
+
+// Total mahasiswa (role = Mahasiswa)
+$stmtTotal = $conn->query("SELECT COUNT(*) as total FROM Users_role WHERE id_role = 4");
+$totalMhs = $stmtTotal->fetch()['total'];
+
+// Presensi hari ini (yang hadir)
+$stmtHadir = $conn->prepare("SELECT COUNT(*) as total FROM Attendances WHERE tanggal = :today AND status = 'Hadir'");
+$stmtHadir->execute([':today' => $today]);
+$hadirHariIni = $stmtHadir->fetch()['total'];
+
+// Jurnal menunggu review (belum ada status validasi)
+$stmtJurnal = $conn->query("SELECT COUNT(*) as total FROM Daily_journal WHERE status = 'Menunggu'");
+$jurnalMenunggu = $stmtJurnal->fetch()['total'] ?? 0;
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -52,7 +76,7 @@ $activePage = 'dashboard';
                             </div>
                             <div>
                                 <p class="text-[13px] text-gray-500 font-medium">Total Mahasiswa</p>
-                                <p class="text-3xl font-bold text-gray-900 mt-0.5">7</p>
+                                <p class="text-3xl font-bold text-gray-900 mt-0.5"><?= $totalMhs ?></p>
                             </div>
                         </div>
                         <p class="text-[13px] text-blue-600 font-medium">
@@ -68,7 +92,7 @@ $activePage = 'dashboard';
                             </div>
                             <div>
                                 <p class="text-[13px] text-gray-500 font-medium">Presensi Hari Ini</p>
-                                <p class="text-3xl font-bold text-gray-900 mt-0.5">5/7</p>
+                                <p class="text-3xl font-bold text-gray-900 mt-0.5"><?= $hadirHariIni ?>/<?= $totalMhs ?></p>
                             </div>
                         </div>
                         <p class="text-[13px] text-green-600 font-medium">Kehadiran baik</p>
@@ -82,7 +106,7 @@ $activePage = 'dashboard';
                             </div>
                             <div>
                                 <p class="text-[13px] text-gray-500 font-medium">Jurnal Menunggu</p>
-                                <p class="text-3xl font-bold text-gray-900 mt-0.5">4</p>
+                                <p class="text-3xl font-bold text-gray-900 mt-0.5"><?= $jurnalMenunggu ?></p>
                             </div>
                         </div>
                         <p class="text-[13px] text-amber-600 font-medium">Perlu direview</p>

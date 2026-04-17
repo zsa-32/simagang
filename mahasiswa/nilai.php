@@ -1,7 +1,58 @@
 <?php
     session_start();
+    require_once '../config/db_connect.php';
+
+    if (!isset($_SESSION['id_user']) || strtolower($_SESSION['role_name']) !== 'mahasiswa') {
+        header('Location: ../index.php'); exit();
+    }
+
     $role = 'mahasiswa';
     $activePage = 'nilai';
+    $id_user = (int) $_SESSION['id_user'];
+
+    // Ambil data profil mahasiswa
+    $stmtP = $conn->prepare("
+        SELECT u.nama, p.nim, p.prodi, p.semester
+        FROM Users u
+        LEFT JOIN Profile p ON u.id_user = p.id_user
+        WHERE u.id_user = :id LIMIT 1
+    ");
+    $stmtP->execute([':id' => $id_user]);
+    $profil = $stmtP->fetch() ?: [];
+
+    // Ambil nilai akhir + komponen
+    $stmtN = $conn->prepare("
+        SELECT nilai_akhir, nilai_laporan, nilai_seminar, catatan, komentar
+        FROM Final_evaluation
+        WHERE id_user = :id ORDER BY id_evaluation DESC LIMIT 1
+    ");
+    $stmtN->execute([':id' => $id_user]);
+    $nilaiData = $stmtN->fetch();
+
+    $nilaiAkhir   = $nilaiData ? (float) $nilaiData['nilai_akhir']   : null;
+    $nilaiLaporan = $nilaiData ? $nilaiData['nilai_laporan']          : null;
+    $nilaiSeminar = $nilaiData ? $nilaiData['nilai_seminar']          : null;
+    $komentar     = $nilaiData ? ($nilaiData['catatan'] ?: $nilaiData['komentar']) : null;
+
+    // Konversi nilai ke grade
+    $grade = '-';
+    $gradeColor = 'text-gray-400';
+    if ($nilaiAkhir !== null) {
+        if ($nilaiAkhir >= 90)      { $grade = 'A';  $gradeColor = 'text-green-600'; }
+        elseif ($nilaiAkhir >= 85) { $grade = 'A-'; $gradeColor = 'text-green-500'; }
+        elseif ($nilaiAkhir >= 80) { $grade = 'B+'; $gradeColor = 'text-blue-600'; }
+        elseif ($nilaiAkhir >= 75) { $grade = 'B';  $gradeColor = 'text-blue-500'; }
+        elseif ($nilaiAkhir >= 70) { $grade = 'B-'; $gradeColor = 'text-blue-400'; }
+        elseif ($nilaiAkhir >= 65) { $grade = 'C+'; $gradeColor = 'text-yellow-600'; }
+        elseif ($nilaiAkhir >= 60) { $grade = 'C';  $gradeColor = 'text-yellow-500'; }
+        else                       { $grade = 'D';  $gradeColor = 'text-red-500'; }
+    }
+
+    // Konversi grade ke poin
+    $gradePoints = ['A'=>4.0,'A-'=>3.7,'B+'=>3.3,'B'=>3.0,'B-'=>2.7,'C+'=>2.3,'C'=>2.0,'D'=>1.0,'-'=>0];
+    $ips = $gradePoints[$grade] ?? 0;
+
+    $get = fn($key, $default='-') => !empty($profil[$key]) ? $profil[$key] : $default;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -67,20 +118,19 @@
                 <div class="bg-[#3b66f5] rounded-2xl p-8 shadow-sm relative overflow-hidden">
                     <div class="text-white z-10 relative">
                         <h2 class="text-[26px] font-bold mb-1.5 tracking-tight">Transkrip Nilai Mahasiswa</h2>
-                        <p class="text-blue-200 text-[14px] mb-5">Semester Ganjil 2023/2024 - Program Studi Teknik Informatika</p>
+                        <p class="text-blue-200 text-[14px] mb-5"><?= htmlspecialchars($get('prodi', 'Teknik Informatika')) ?></p>
                         <div class="flex flex-wrap items-center gap-6 text-[13px] text-blue-100">
                             <span class="flex items-center gap-2">
-                                <i class="fas fa-user text-blue-300"></i> Ahmad Rizki
+                                <i class="fas fa-user text-blue-300"></i> <?= htmlspecialchars($get('nama')) ?>
                             </span>
                             <span class="flex items-center gap-2">
-                                <i class="fas fa-id-card text-blue-300"></i> NIM: 2023001234
+                                <i class="fas fa-id-card text-blue-300"></i> NIM: <?= htmlspecialchars($get('nim')) ?>
                             </span>
                             <span class="flex items-center gap-2">
-                                <i class="fas fa-book-open text-blue-300"></i> Semester 6
+                                <i class="fas fa-book-open text-blue-300"></i> Semester <?= htmlspecialchars($get('semester')) ?>
                             </span>
                         </div>
                     </div>
-                    <!-- Decorative overlay -->
                     <div class="absolute right-0 top-0 w-80 h-full bg-gradient-to-l from-[#254bdb] to-transparent z-0 opacity-80"></div>
                 </div>
 
@@ -89,16 +139,22 @@
                     <div>
                         <h3 class="text-[20px] font-bold text-gray-800 mb-1">Nilai Akhir</h3>
                         <p class="text-[14px] text-gray-400">Indeks Prestasi Semester (IPS)</p>
+                        <?php if ($nilaiData && !empty($nilaiData['komentar'])): ?>
+                            <p class="text-[13px] text-gray-500 mt-2 max-w-xs italic">"<?= htmlspecialchars($nilaiData['komentar']) ?>"</p>
+                        <?php elseif ($nilaiAkhir === null): ?>
+                            <p class="text-[13px] text-amber-500 mt-2">Nilai belum diinput oleh dosen.</p>
+                        <?php endif; ?>
                     </div>
                     <!-- IPS Ring -->
                     <div class="ips-ring shrink-0">
                         <svg viewBox="0 0 80 80" width="90" height="90">
                             <circle class="track" cx="40" cy="40" r="35"/>
-                            <circle class="progress" cx="40" cy="40" r="35"/>
+                            <circle class="progress" cx="40" cy="40" r="35"
+                                style="stroke-dashoffset: <?= $nilaiAkhir ? round(220 - (220 * $nilaiAkhir / 100)) : 220 ?>"/>
                         </svg>
                         <div class="ips-label">
-                            <span class="text-[20px] font-bold text-[#3b82f6] leading-none">A</span>
-                            <span class="text-[11px] text-gray-500 font-medium mt-0.5">3.85</span>
+                            <span class="text-[20px] font-bold text-[#3b82f6] leading-none"><?= $grade ?></span>
+                            <span class="text-[11px] text-gray-500 font-medium mt-0.5"><?= number_format($ips, 2) ?></span>
                         </div>
                     </div>
                 </div>
