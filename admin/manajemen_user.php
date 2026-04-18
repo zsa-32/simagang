@@ -17,7 +17,8 @@ $stmt = $conn->query("
         u.id_user, u.nama, u.email,
         r.nama_role,
         COALESCE(p.nim, p.nip, '-')  AS nomor_induk,
-        COALESCE(c.nama_company, '-') AS perusahaan
+        COALESCE(c.nama_company, '-') AS perusahaan,
+        p.id_dosen_pembimbing, p.id_pembimbing_lapang
     FROM Users u
     LEFT JOIN Users_role   ur ON u.id_user   = ur.id_user
     LEFT JOIN Roles         r  ON ur.id_role  = r.id_role
@@ -27,6 +28,26 @@ $stmt = $conn->query("
     ORDER BY r.id_role ASC, u.nama ASC
 ");
 $usersDB = $stmt->fetchAll();
+
+// Ambil daftar Dosen Pembimbing
+$stmtDosen = $conn->query("
+    SELECT u.id_user, u.nama FROM Users u
+    JOIN Users_role ur ON u.id_user = ur.id_user
+    JOIN Roles r ON ur.id_role = r.id_role
+    WHERE LOWER(r.nama_role) = 'dosen pembimbing'
+    ORDER BY u.nama ASC
+");
+$dosenList = $stmtDosen->fetchAll();
+
+// Ambil daftar Pembimbing Lapang
+$stmtPembimbing = $conn->query("
+    SELECT u.id_user, u.nama FROM Users u
+    JOIN Users_role ur ON u.id_user = ur.id_user
+    JOIN Roles r ON ur.id_role = r.id_role
+    WHERE LOWER(r.nama_role) = 'pembimbing lapang'
+    ORDER BY u.nama ASC
+");
+$pembimbingList = $stmtPembimbing->fetchAll();
 
 // Palet warna avatar bergilir
 $avatarColors = ['bg-blue-600','bg-indigo-500','bg-green-600','bg-blue-500','bg-purple-600','bg-purple-500','bg-indigo-600','bg-blue-700'];
@@ -213,7 +234,7 @@ $avatarColors = ['bg-blue-600','bg-indigo-500','bg-green-600','bg-blue-500','bg-
                                                 <button
                                                     class="w-8 h-8 rounded-lg border border-blue-200 text-blue-500 hover:bg-blue-50 transition-colors flex items-center justify-center"
                                                     title="Edit"
-                                                    onclick="openEditModal('<?= $u['id_user'] ?>', '<?= htmlspecialchars($u['nama'], ENT_QUOTES) ?>', '<?= htmlspecialchars($u['email'], ENT_QUOTES) ?>', '<?= htmlspecialchars($roleLabel, ENT_QUOTES) ?>', '<?= htmlspecialchars($u['nomor_induk'], ENT_QUOTES) ?>')">
+                                                    onclick="openEditModal('<?= $u['id_user'] ?>', '<?= htmlspecialchars($u['nama'], ENT_QUOTES) ?>', '<?= htmlspecialchars($u['email'], ENT_QUOTES) ?>', '<?= htmlspecialchars($roleLabel, ENT_QUOTES) ?>', '<?= htmlspecialchars($u['nomor_induk'], ENT_QUOTES) ?>', '<?= (int)($u['id_dosen_pembimbing'] ?? 0) ?>', '<?= (int)($u['id_pembimbing_lapang'] ?? 0) ?>')">
                                                     <i class="fas fa-pen text-[12px]"></i>
                                                 </button>
                                                 <!-- Hapus via form POST -->
@@ -283,7 +304,7 @@ $avatarColors = ['bg-blue-600','bg-indigo-500','bg-green-600','bg-blue-500','bg-
     <div class="grid grid-cols-2 gap-4">
         <div class="mb-4">
             <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Role</label>
-            <select name="role" required
+            <select name="role" id="roleSelectBuat" required onchange="toggleMhsFields(this.value, 'buat')"
                 class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-white">
                 <option value="">Pilih role...</option>
                 <option value="mahasiswa">Mahasiswa</option>
@@ -296,6 +317,31 @@ $avatarColors = ['bg-blue-600','bg-indigo-500','bg-green-600','bg-blue-500','bg-
             <label class="block text-[13px] font-medium text-gray-700 mb-1.5">NIM/NIP</label>
             <input type="text" name="nomor_induk" placeholder="Masukan NIM/NIP" required
                 class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
+        </div>
+    </div>
+
+    <!-- Dropdown relasi (hanya muncul jika role = Mahasiswa) -->
+    <div id="mhsFieldsBuat" class="hidden space-y-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+        <p class="text-[12px] font-semibold text-blue-600"><i class="fas fa-link mr-1"></i>Hubungkan dengan Pembimbing</p>
+        <div>
+            <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dosen Pembimbing</label>
+            <select name="id_dosen_pembimbing"
+                class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-white">
+                <option value="">-- Pilih Dosen Pembimbing --</option>
+                <?php foreach ($dosenList as $d): ?>
+                <option value="<?= $d['id_user'] ?>"><?= htmlspecialchars($d['nama']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Pembimbing Lapang</label>
+            <select name="id_pembimbing_lapang"
+                class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-white">
+                <option value="">-- Pilih Pembimbing Lapang --</option>
+                <?php foreach ($pembimbingList as $pb): ?>
+                <option value="<?= $pb['id_user'] ?>"><?= htmlspecialchars($pb['nama']) ?></option>
+                <?php endforeach; ?>
+            </select>
         </div>
     </div>
 
@@ -351,7 +397,7 @@ $avatarColors = ['bg-blue-600','bg-indigo-500','bg-green-600','bg-blue-500','bg-
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Role</label>
-                        <select name="role" id="editRole" required
+                        <select name="role" id="editRole" required onchange="toggleMhsFields(this.value, 'edit')"
                             class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-gray-50">
                             <option value="">Pilih role...</option>
                             <option value="Mahasiswa">Mahasiswa</option>
@@ -363,6 +409,31 @@ $avatarColors = ['bg-blue-600','bg-indigo-500','bg-green-600','bg-blue-500','bg-
                         <label class="block text-[13px] font-medium text-gray-700 mb-1.5">NIM / NIP</label>
                         <input type="text" name="nomor_induk" id="editNomorInduk" placeholder="NIM / NIP"
                             class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-gray-50">
+                    </div>
+                </div>
+
+                <!-- Dropdown relasi Mahasiswa -->
+                <div id="mhsFieldsEdit" class="hidden space-y-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+                    <p class="text-[12px] font-semibold text-blue-600"><i class="fas fa-link mr-1"></i>Hubungkan dengan Pembimbing</p>
+                    <div>
+                        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dosen Pembimbing</label>
+                        <select name="id_dosen_pembimbing" id="editIdDosen"
+                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-white">
+                            <option value="">-- Pilih Dosen Pembimbing --</option>
+                            <?php foreach ($dosenList as $d): ?>
+                            <option value="<?= $d['id_user'] ?>"><?= htmlspecialchars($d['nama']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Pembimbing Lapang</label>
+                        <select name="id_pembimbing_lapang" id="editIdPembimbing"
+                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all bg-white">
+                            <option value="">-- Pilih Pembimbing Lapang --</option>
+                            <?php foreach ($pembimbingList as $pb): ?>
+                            <option value="<?= $pb['id_user'] ?>"><?= htmlspecialchars($pb['nama']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                 </div>
 
@@ -417,8 +488,16 @@ $avatarColors = ['bg-blue-600','bg-indigo-500','bg-green-600','bg-blue-500','bg-
             });
         }
 
+        // ===== Toggle Mhs Fields =====
+        function toggleMhsFields(roleVal, scope) {
+            const isMhs = roleVal.toLowerCase() === 'mahasiswa';
+            const el = document.getElementById(scope === 'buat' ? 'mhsFieldsBuat' : 'mhsFieldsEdit');
+            if (!el) return;
+            el.classList.toggle('hidden', !isMhs);
+        }
+
         // ===== Edit User Modal =====
-        function openEditModal(idUser, nama, email, role, nomorInduk) {
+        function openEditModal(idUser, nama, email, role, nomorInduk, idDosen, idPembimbing) {
             document.getElementById('editUserId').value = idUser;
             document.getElementById('editNama').value = nama;
             document.getElementById('editEmail').value = email;
@@ -433,6 +512,15 @@ $avatarColors = ['bg-blue-600','bg-indigo-500','bg-green-600','bg-blue-500','bg-
                     break;
                 }
             }
+
+            // Tampilkan/sembunyikan dropdown relasi
+            toggleMhsFields(role, 'edit');
+
+            // Set dropdown dosen & pembimbing
+            const selDosen = document.getElementById('editIdDosen');
+            const selPembimbing = document.getElementById('editIdPembimbing');
+            selDosen.value = idDosen || '';
+            selPembimbing.value = idPembimbing || '';
 
             const modal = document.getElementById('modalEditUser');
             modal.classList.remove('hidden');

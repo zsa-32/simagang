@@ -14,12 +14,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // Ambil & sanitasi input
-$id_user      = (int) ($_POST['id_user']      ?? 0);
-$nama         = trim($_POST['nama']            ?? '');
-$email        = trim($_POST['email']           ?? '');
-$role         = trim($_POST['role']            ?? '');
-$nomor_induk  = trim($_POST['nomor_induk']     ?? '');
-$password     = trim($_POST['password']        ?? '');
+$id_user               = (int) ($_POST['id_user']               ?? 0);
+$nama                  = trim($_POST['nama']                    ?? '');
+$email                 = trim($_POST['email']                   ?? '');
+$role                  = trim($_POST['role']                    ?? '');
+$nomor_induk           = trim($_POST['nomor_induk']             ?? '');
+$password              = trim($_POST['password']                ?? '');
+$id_dosen_pembimbing   = (int) ($_POST['id_dosen_pembimbing']   ?? 0) ?: null;
+$id_pembimbing_lapang  = (int) ($_POST['id_pembimbing_lapang']  ?? 0) ?: null;
 
 if (!$id_user || empty($nama) || empty($email) || empty($role)) {
     header('Location: manajemen_user.php?error=field_kosong');
@@ -95,26 +97,39 @@ try {
     }
     $stmtRole->execute([':id_user' => $id_user, ':id_role' => $id_role]);
 
-    // 4. Update Profile (NIM/NIP)
-    if (!empty($nomor_induk)) {
-        $nim = ($id_role === 4) ? $nomor_induk : null;
-        $nip = ($id_role !== 4) ? $nomor_induk : null;
+    // 4. Update Profile (NIM/NIP + relasi dosen & pembimbing)
+    $nim = ($id_role === 4 && !empty($nomor_induk)) ? $nomor_induk : null;
+    $nip = ($id_role !== 4 && !empty($nomor_induk)) ? $nomor_induk : null;
 
-        $stmtCekProfile = $conn->prepare("SELECT id_profile FROM Profile WHERE id_user = :id_user LIMIT 1");
-        $stmtCekProfile->execute([':id_user' => $id_user]);
-        $existingProfile = $stmtCekProfile->fetch();
+    // Relasi hanya untuk mahasiswa
+    $dosenRel      = ($id_role === 4) ? $id_dosen_pembimbing  : null;
+    $pembimbingRel = ($id_role === 4) ? $id_pembimbing_lapang : null;
 
-        if ($existingProfile) {
-            $stmtProfile = $conn->prepare(
-                "UPDATE Profile SET nim = :nim, nip = :nip WHERE id_user = :id_user"
-            );
-        } else {
-            $stmtProfile = $conn->prepare(
-                "INSERT INTO Profile (id_user, nim, nip) VALUES (:id_user, :nim, :nip)"
-            );
-        }
-        $stmtProfile->execute([':id_user' => $id_user, ':nim' => $nim, ':nip' => $nip]);
+    $stmtCekProfile = $conn->prepare("SELECT id_profile FROM Profile WHERE id_user = :id_user LIMIT 1");
+    $stmtCekProfile->execute([':id_user' => $id_user]);
+    $existingProfile = $stmtCekProfile->fetch();
+
+    if ($existingProfile) {
+        $stmtProfile = $conn->prepare(
+            "UPDATE Profile
+             SET nim = :nim, nip = :nip,
+                 id_dosen_pembimbing = :id_dosen,
+                 id_pembimbing_lapang = :id_pembimbing
+             WHERE id_user = :id_user"
+        );
+    } else {
+        $stmtProfile = $conn->prepare(
+            "INSERT INTO Profile (id_user, nim, nip, id_dosen_pembimbing, id_pembimbing_lapang)
+             VALUES (:id_user, :nim, :nip, :id_dosen, :id_pembimbing)"
+        );
     }
+    $stmtProfile->execute([
+        ':id_user'      => $id_user,
+        ':nim'          => $nim,
+        ':nip'          => $nip,
+        ':id_dosen'     => $dosenRel,
+        ':id_pembimbing'=> $pembimbingRel,
+    ]);
 
     header('Location: manajemen_user.php?success=user_diperbarui');
     exit();

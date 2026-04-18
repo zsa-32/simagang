@@ -11,13 +11,7 @@ $activePage = 'monitoring_mahasiswa';
 $id_user = (int) $_SESSION['id_user'];
 $today = date('Y-m-d');
 
-// Ambil nama perusahaan pembimbing
-$stmtPb = $conn->prepare("SELECT nama_perusahaan FROM Profile WHERE id_user = :id LIMIT 1");
-$stmtPb->execute([':id' => $id_user]);
-$pbData = $stmtPb->fetch();
-$namaPerusahaan = $pbData['nama_perusahaan'] ?? null;
-
-// Presensi mahasiswa hari ini di perusahaan yang sama
+// Presensi mahasiswa yang dibimbing oleh pembimbing ini (by id_pembimbing_lapang)
 $stmtP = $conn->prepare("
     SELECT u.nama, p.nim,
            c.nama_company AS perusahaan,
@@ -29,25 +23,22 @@ $stmtP = $conn->prepare("
     LEFT JOIN Company c ON ip.id_company = c.id_company
     LEFT JOIN Users u2 ON p.id_dosen_pembimbing = u2.id_user
     LEFT JOIN Attendances a ON a.id_user = u.id_user AND a.tanggal = :today
-    WHERE c.nama_company = :perusahaan
-    AND u.id_user != :id_pb
+    WHERE p.id_pembimbing_lapang = :id_pb
     ORDER BY u.nama ASC
 ");
-$stmtP->execute([':today' => $today, ':perusahaan' => $namaPerusahaan, ':id_pb' => $id_user]);
+$stmtP->execute([':today' => $today, ':id_pb' => $id_user]);
 $presensiList = $stmtP->fetchAll();
 
-// Jurnal mahasiswa
+// Jurnal mahasiswa bimbingan pembimbing ini
 $stmtJ = $conn->prepare("
-    SELECT u.nama, p.nim, dj.kegiatan, dj.tanggal, dj.status
+    SELECT u.nama, p.nim, dj.kegiatan, dj.bukti, dj.tanggal, dj.status
     FROM Daily_journal dj
     JOIN Users u ON dj.id_user = u.id_user
     JOIN Profile p ON u.id_user = p.id_user
-    LEFT JOIN Internship_placement ip ON u.id_user = ip.id_user
-    LEFT JOIN Company c ON ip.id_company = c.id_company
-    WHERE c.nama_company = :perusahaan AND u.id_user != :id_pb
+    WHERE p.id_pembimbing_lapang = :id_pb
     ORDER BY dj.tanggal DESC
 ");
-$stmtJ->execute([':perusahaan' => $namaPerusahaan, ':id_pb' => $id_user]);
+$stmtJ->execute([':id_pb' => $id_user]);
 $jurnalList = $stmtJ->fetchAll();
 
 // Hitung stats
@@ -194,7 +185,9 @@ $jmlJurnalDisetujui = count(array_filter($jurnalList, fn($j) => $j['status'] ===
                                         <td class="px-6 py-4 text-[13px] text-gray-600"><?= htmlspecialchars($mhs['nama_dosen'] ?? '-') ?></td>
                                         <td class="px-6 py-4 text-[13px] text-gray-600 font-medium"><?= $mhs['waktu_masuk'] ?? '-' ?></td>
                                         <td class="px-6 py-4">
-                                            <button class="flex items-center gap-1.5 px-3 py-1.5 border border-blue-200 text-blue-600 rounded-lg text-[12px] font-medium hover:bg-blue-50 transition-colors">
+                                            <button
+                                                onclick="openPresensiDetail(`<?= htmlspecialchars($mhs['nama'], ENT_QUOTES) ?>`, `<?= $mhs['nim'] ?>`, `<?= htmlspecialchars($mhs['perusahaan'] ?? '-', ENT_QUOTES) ?>`, `<?= $mhs['nama_dosen'] ?? '-' ?>`, `<?= $mhs['keterangan'] ?? '' ?>`, `<?= $mhs['waktu_masuk'] ?? '' ?>`, `<?= $mhs['waktu_keluar'] ?? '' ?>`)"
+                                                class="flex items-center gap-1.5 px-3 py-1.5 border border-blue-200 text-blue-600 rounded-lg text-[12px] font-medium hover:bg-blue-50 transition-colors">
                                                 <i class="fas fa-eye text-[11px]"></i> Lihat
                                             </button>
                                         </td>
@@ -213,6 +206,7 @@ $jmlJurnalDisetujui = count(array_filter($jurnalList, fn($j) => $j['status'] ===
                                     <th class="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-6 py-3.5">Mahasiswa</th>
                                     <th class="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-6 py-3.5">Judul Jurnal</th>
                                     <th class="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-6 py-3.5">Tanggal</th>
+                                    <th class="text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-6 py-3.5 w-20">Bukti</th>
                                     <th class="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-6 py-3.5">Status</th>
                                     <th class="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-6 py-3.5">Aksi</th>
                                 </tr>
@@ -236,11 +230,27 @@ $jmlJurnalDisetujui = count(array_filter($jurnalList, fn($j) => $j['status'] ===
                                         </td>
                                         <td class="px-6 py-4 text-[13px] text-gray-700"><?= htmlspecialchars(explode("\n", $j['kegiatan'])[0]) ?></td>
                                         <td class="px-6 py-4 text-[13px] text-gray-500"><?= date('d M Y', strtotime($j['tanggal'])) ?></td>
+                                        <!-- Kolom Bukti -->
+                                        <td class="px-6 py-4 text-center">
+                                            <?php if (!empty($j['bukti'])): ?>
+                                                <a href="../<?= htmlspecialchars($j['bukti']) ?>" target="_blank"
+                                                   title="Lihat Bukti"
+                                                   class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-500 hover:bg-indigo-100 hover:border-indigo-300 transition-all">
+                                                    <i class="fas fa-image text-[14px]"></i>
+                                                </a>
+                                            <?php else: ?>
+                                                <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-gray-50 border border-gray-100 text-gray-300" title="Tidak ada bukti">
+                                                    <i class="fas fa-image text-[14px]"></i>
+                                                </span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td class="px-6 py-4">
                                             <span class="px-2.5 py-1 rounded-lg text-[12px] font-semibold <?= $jBadge ?>"><?= $j['status'] ?></span>
                                         </td>
                                         <td class="px-6 py-4">
-                                            <button class="flex items-center gap-1.5 px-3 py-1.5 border border-blue-200 text-blue-600 rounded-lg text-[12px] font-medium hover:bg-blue-50 transition-colors">
+                                            <button
+                                                onclick="openJurnalDetail(`<?= htmlspecialchars($j['nama'], ENT_QUOTES) ?>`, `<?= $j['nim'] ?>`, `<?= addslashes(htmlspecialchars(explode('\n', $j['kegiatan'])[0])) ?>`, `<?= addslashes(htmlspecialchars($j['kegiatan'])) ?>`, `<?= date('d M Y', strtotime($j['tanggal'])) ?>`, `<?= $j['status'] ?>`, `<?= addslashes($j['bukti'] ?? '') ?>`)"
+                                                class="flex items-center gap-1.5 px-3 py-1.5 border border-blue-200 text-blue-600 rounded-lg text-[12px] font-medium hover:bg-blue-50 transition-colors">
                                                 <i class="fas fa-eye text-[11px]"></i> Lihat
                                             </button>
                                         </td>
@@ -257,6 +267,99 @@ $jmlJurnalDisetujui = count(array_filter($jurnalList, fn($j) => $j['status'] ===
         </main>
 
         <?php include '../includes/footer.php'; ?>
+    </div>
+
+    <!-- ===== Modal Detail Presensi ===== -->
+    <div id="modalPresensi" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+            <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+                <h3 class="text-[16px] font-bold text-gray-900">Detail Presensi</h3>
+                <button onclick="closeModal('modalPresensi')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            <div class="px-6 py-5 space-y-4">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center text-white font-bold text-[16px] shrink-0" id="pAvatar"></div>
+                    <div>
+                        <p id="pNama" class="font-bold text-gray-900 text-[15px]"></p>
+                        <p id="pNim" class="text-[13px] text-gray-400"></p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-gray-50 rounded-xl p-3">
+                        <p class="text-[11px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Perusahaan</p>
+                        <p id="pPerusahaan" class="text-[13px] font-medium text-gray-800"></p>
+                    </div>
+                    <div class="bg-gray-50 rounded-xl p-3">
+                        <p class="text-[11px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Dosen Pembimbing</p>
+                        <p id="pDosen" class="text-[13px] font-medium text-gray-800"></p>
+                    </div>
+                    <div class="bg-gray-50 rounded-xl p-3">
+                        <p class="text-[11px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Status Kehadiran</p>
+                        <p id="pStatus" class="text-[13px] font-semibold"></p>
+                    </div>
+                    <div class="bg-gray-50 rounded-xl p-3">
+                        <p class="text-[11px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Waktu Masuk</p>
+                        <p id="pWaktuMasuk" class="text-[13px] font-medium text-gray-800"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-100 flex justify-end">
+                <button onclick="closeModal('modalPresensi')" class="px-5 py-2 border border-gray-200 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-50">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Modal Detail Jurnal ===== -->
+    <div id="modalJurnal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100 sticky top-0 bg-white z-10">
+                <h3 class="text-[16px] font-bold text-gray-900">Detail Jurnal</h3>
+                <button onclick="closeModal('modalJurnal')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            <div class="px-6 py-5 space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Mahasiswa</p>
+                        <p id="jNama" class="text-[14px] font-semibold text-gray-800"></p>
+                        <p id="jNim" class="text-[12px] text-gray-400 mt-0.5"></p>
+                    </div>
+                    <div>
+                        <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Tanggal</p>
+                        <p id="jTanggal" class="text-[14px] text-gray-700"></p>
+                    </div>
+                </div>
+                <div>
+                    <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Judul Kegiatan</p>
+                    <p id="jJudul" class="text-[14px] font-semibold text-gray-800"></p>
+                </div>
+                <div>
+                    <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Detail Kegiatan</p>
+                    <p id="jKegiatan" class="text-[14px] text-gray-700 bg-gray-50 rounded-xl px-4 py-3 leading-relaxed whitespace-pre-line"></p>
+                </div>
+                <!-- Bukti -->
+                <div id="jBuktiWrap" class="hidden">
+                    <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Bukti Kegiatan</p>
+                    <a id="jBuktiLink" href="#" target="_blank"
+                       class="group block overflow-hidden rounded-xl border border-gray-200 bg-gray-50 hover:border-indigo-300 transition-all">
+                        <img id="jBuktiImg" src="#" alt="Bukti Jurnal" class="w-full max-h-48 object-contain bg-gray-50">
+                        <div class="flex items-center gap-2 px-3 py-2 border-t border-gray-100 text-[12px] text-indigo-600 font-medium group-hover:bg-indigo-50 transition-colors">
+                            <i class="fas fa-external-link-alt text-[11px]"></i> Buka gambar penuh
+                        </div>
+                    </a>
+                </div>
+                <div id="jNoBuktiWrap" class="hidden">
+                    <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Bukti Kegiatan</p>
+                    <p class="text-[13px] text-gray-400 italic bg-gray-50 rounded-xl px-4 py-3">Tidak ada bukti yang dilampirkan.</p>
+                </div>
+                <div>
+                    <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Status</p>
+                    <span id="jStatus" class="px-3 py-1 rounded-full text-[12px] font-semibold"></span>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-100 flex justify-end sticky bottom-0 bg-white">
+                <button onclick="closeModal('modalJurnal')" class="px-5 py-2 border border-gray-200 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-50">Tutup</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -285,7 +388,6 @@ $jmlJurnalDisetujui = count(array_filter($jurnalList, fn($j) => $j['status'] ===
                 }
             });
 
-            // Reset search
             document.getElementById('searchInput').value = '';
             filterRows();
         }
@@ -297,6 +399,76 @@ $jmlJurnalDisetujui = count(array_filter($jurnalList, fn($j) => $j['status'] ===
             document.querySelectorAll(selector).forEach(row => {
                 row.style.display = row.dataset.search.includes(q) ? '' : 'none';
             });
+        }
+
+        // ======= Modal Helper =======
+        function closeModal(id) {
+            const m = document.getElementById(id);
+            m.classList.add('hidden');
+            m.classList.remove('flex');
+        }
+        function openModal(id) {
+            const m = document.getElementById(id);
+            m.classList.remove('hidden');
+            m.classList.add('flex');
+        }
+        // Klik backdrop tutup modal
+        ['modalPresensi', 'modalJurnal'].forEach(id => {
+            document.getElementById(id).addEventListener('click', function(e) {
+                if (e.target === this) closeModal(id);
+            });
+        });
+
+        // ======= Modal Detail Presensi =======
+        function openPresensiDetail(nama, nim, perusahaan, dosen, status, masuk, keluar) {
+            document.getElementById('pAvatar').textContent      = nama.substring(0,2).toUpperCase();
+            document.getElementById('pNama').textContent        = nama;
+            document.getElementById('pNim').textContent         = nim;
+            document.getElementById('pPerusahaan').textContent  = perusahaan || '-';
+            document.getElementById('pDosen').textContent       = dosen || '-';
+            document.getElementById('pWaktuMasuk').textContent  = masuk || '-';
+
+            const statusEl = document.getElementById('pStatus');
+            const statusMap = {
+                'Hadir':  { cls: 'text-green-600', label: '● Hadir' },
+                'Izin':   { cls: 'text-amber-600', label: '● Izin' },
+                'Sakit':  { cls: 'text-amber-600', label: '● Sakit' },
+                'Alpha':  { cls: 'text-red-600',   label: '● Tidak Hadir' },
+            };
+            const s = statusMap[status] || { cls: 'text-gray-400', label: '● Belum presensi' };
+            statusEl.className = 'text-[13px] font-semibold ' + s.cls;
+            statusEl.textContent = s.label;
+
+            openModal('modalPresensi');
+        }
+
+        // ======= Modal Detail Jurnal =======
+        function openJurnalDetail(nama, nim, judul, kegiatan, tanggal, status, bukti) {
+            document.getElementById('jNama').textContent    = nama;
+            document.getElementById('jNim').textContent     = nim;
+            document.getElementById('jJudul').textContent   = judul;
+            document.getElementById('jKegiatan').textContent = kegiatan;
+            document.getElementById('jTanggal').textContent = tanggal;
+
+            const statusEl = document.getElementById('jStatus');
+            const badges = { 'Disetujui': 'bg-green-100 text-green-700', 'Ditolak': 'bg-red-100 text-red-600', 'Menunggu': 'bg-amber-100 text-amber-700' };
+            statusEl.className = 'px-3 py-1 rounded-full text-[12px] font-semibold ' + (badges[status] || badges['Menunggu']);
+            statusEl.textContent = status;
+
+            const buktiWrap   = document.getElementById('jBuktiWrap');
+            const noBuktiWrap = document.getElementById('jNoBuktiWrap');
+            if (bukti) {
+                const baseUrl = window.location.origin + '/simagang/';
+                document.getElementById('jBuktiImg').src   = baseUrl + bukti;
+                document.getElementById('jBuktiLink').href = baseUrl + bukti;
+                buktiWrap.classList.remove('hidden');
+                noBuktiWrap.classList.add('hidden');
+            } else {
+                buktiWrap.classList.add('hidden');
+                noBuktiWrap.classList.remove('hidden');
+            }
+
+            openModal('modalJurnal');
         }
     </script>
 

@@ -24,7 +24,7 @@
     if (!empty($mhsIds)) {
         $placeholders = implode(',', array_fill(0, count($mhsIds), '?'));
         $stmtJ = $conn->prepare("
-            SELECT dj.id_journal, u.nama, p.nim, dj.tanggal, dj.kegiatan, dj.status, dj.catatan_dosen
+            SELECT dj.id_journal, u.nama, p.nim, dj.tanggal, dj.kegiatan, dj.bukti, dj.status, dj.catatan_dosen
             FROM Daily_journal dj
             JOIN Users u ON dj.id_user = u.id_user
             LEFT JOIN Profile p ON u.id_user = p.id_user
@@ -139,6 +139,7 @@
                                     <th class="text-left px-6 py-4 font-semibold">Mahasiswa</th>
                                     <th class="text-left px-6 py-4 font-semibold">Tanggal</th>
                                     <th class="text-left px-6 py-4 font-semibold">Kegiatan</th>
+                                    <th class="text-center px-6 py-4 font-semibold w-20">Bukti</th>
                                     <th class="text-left px-6 py-4 font-semibold">Status</th>
                                     <th class="text-left px-6 py-4 font-semibold">Detail</th>
                                 </tr>
@@ -175,8 +176,22 @@
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 text-gray-500 whitespace-nowrap"><?= $j['tanggal'] ?></td>
-                                        <td class="px-6 py-4 text-gray-700 max-w-[240px]">
+                                        <td class="px-6 py-4 text-gray-700 max-w-[200px]">
                                             <span class="line-clamp-1"><?= htmlspecialchars($judul) ?></span>
+                                        </td>
+                                        <!-- Kolom Bukti -->
+                                        <td class="px-6 py-4 text-center">
+                                            <?php if (!empty($j['bukti'])): ?>
+                                                <a href="../<?= htmlspecialchars($j['bukti']) ?>" target="_blank"
+                                                   title="Lihat Bukti"
+                                                   class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-500 hover:bg-indigo-100 hover:border-indigo-300 transition-all">
+                                                    <i class="fas fa-image text-[14px]"></i>
+                                                </a>
+                                            <?php else: ?>
+                                                <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-gray-50 border border-gray-100 text-gray-300" title="Tidak ada bukti">
+                                                    <i class="fas fa-image text-[14px]"></i>
+                                                </span>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="px-6 py-4">
                                             <span class="px-3 py-1 rounded-full text-[12px] font-semibold <?= $statusClass ?>">
@@ -184,7 +199,7 @@
                                             </span>
                                         </td>
                                         <td class="px-6 py-4">
-                                            <button onclick="openValidasi(<?= $j['id_journal'] ?>, `<?= addslashes(htmlspecialchars($j['nama'])) ?>`, `<?= addslashes(htmlspecialchars($judul)) ?>`, `<?= $j['tanggal'] ?>`, `<?= addslashes(htmlspecialchars($deskrob)) ?>`, `<?= $j['status'] ?>`, `<?= addslashes(htmlspecialchars($j['catatan_dosen'] ?? '')) ?>`)"
+                                            <button onclick="openValidasi(<?= $j['id_journal'] ?>, `<?= addslashes(htmlspecialchars($j['nama'])) ?>`, `<?= addslashes(htmlspecialchars($judul)) ?>`, `<?= $j['tanggal'] ?>`, `<?= addslashes(htmlspecialchars($deskrob)) ?>`, `<?= $j['status'] ?>`, `<?= addslashes(htmlspecialchars($j['catatan_dosen'] ?? '')) ?>`, `<?= addslashes($j['bukti'] ?? '') ?>`)"
                                                 class="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 text-[13px] font-medium hover:underline transition-colors">
                                                 <i class="fas fa-eye text-[12px]"></i> Lihat
                                             </button>
@@ -229,6 +244,22 @@
                     <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Deskripsi</p>
                     <p id="vDeskripsi" class="text-[14px] text-gray-700 leading-relaxed bg-gray-50 rounded-xl px-4 py-3 whitespace-pre-line"></p>
                 </div>
+                <!-- Bukti Kegiatan -->
+                <div id="vBuktiWrap" class="hidden">
+                    <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Bukti Kegiatan</p>
+                    <a id="vBuktiLink" href="#" target="_blank"
+                       class="group block overflow-hidden rounded-xl border border-gray-200 bg-gray-50 hover:border-indigo-300 transition-all">
+                        <img id="vBuktiImg" src="#" alt="Bukti Jurnal"
+                             class="w-full max-h-44 object-contain bg-gray-50">
+                        <div class="flex items-center gap-2 px-3 py-2 border-t border-gray-100 text-[12px] text-indigo-600 font-medium group-hover:bg-indigo-50 transition-colors">
+                            <i class="fas fa-external-link-alt text-[11px]"></i> Buka gambar penuh
+                        </div>
+                    </a>
+                </div>
+                <div id="vNoBuktiWrap" class="hidden">
+                    <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Bukti Kegiatan</p>
+                    <p class="text-[13px] text-gray-400 italic bg-gray-50 rounded-xl px-4 py-3">Tidak ada bukti yang dilampirkan.</p>
+                </div>
                 <div>
                     <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Status Saat Ini</p>
                     <span id="vStatus" class="px-3 py-1 rounded-full text-[12px] font-semibold"></span>
@@ -271,18 +302,32 @@
         });
 
         // ===== Modal Validasi =====
-        function openValidasi(id, nama, judul, tanggal, deskripsi, status, catatan) {
-            document.getElementById('vIdJurnal').value    = id;
-            document.getElementById('vNama').textContent  = nama;
-            document.getElementById('vJudul').textContent = judul;
-            document.getElementById('vTanggal').textContent = tanggal;
+        function openValidasi(id, nama, judul, tanggal, deskripsi, status, catatan, bukti) {
+            document.getElementById('vIdJurnal').value       = id;
+            document.getElementById('vNama').textContent     = nama;
+            document.getElementById('vJudul').textContent    = judul;
+            document.getElementById('vTanggal').textContent  = tanggal;
             document.getElementById('vDeskripsi').textContent = deskripsi;
-            document.getElementById('vCatatan').value     = catatan;
+            document.getElementById('vCatatan').value        = catatan;
 
             const statusEl = document.getElementById('vStatus');
             const badges = { 'Disetujui': 'bg-green-100 text-green-700', 'Ditolak': 'bg-red-100 text-red-600', 'Menunggu': 'bg-amber-100 text-amber-600' };
             statusEl.className = 'px-3 py-1 rounded-full text-[12px] font-semibold ' + (badges[status] || badges['Menunggu']);
             statusEl.textContent = status;
+
+            // Tampilkan bukti
+            const buktiWrap   = document.getElementById('vBuktiWrap');
+            const noBuktiWrap = document.getElementById('vNoBuktiWrap');
+            if (bukti) {
+                const baseUrl = window.location.origin + '/simagang/';
+                document.getElementById('vBuktiImg').src   = baseUrl + bukti;
+                document.getElementById('vBuktiLink').href = baseUrl + bukti;
+                buktiWrap.classList.remove('hidden');
+                noBuktiWrap.classList.add('hidden');
+            } else {
+                buktiWrap.classList.add('hidden');
+                noBuktiWrap.classList.remove('hidden');
+            }
 
             const modal = document.getElementById('modalValidasi');
             modal.classList.remove('hidden');

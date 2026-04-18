@@ -37,7 +37,7 @@ if (!empty($_FILES['bukti']['name'])) {
         header('Location: ../mahasiswa/tambahjurnal.php?error=file_format'); exit();
     }
 
-    $uploadDir = '../assets/uploads/jurnal/';
+    $uploadDir = __DIR__ . '/../assets/uploads/jurnal/';
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0755, true);
     }
@@ -57,13 +57,14 @@ try {
     $kegiatan = $judul . "\n\n" . $deskripsi;
 
     $stmt = $conn->prepare("
-        INSERT INTO Daily_journal (id_user, tanggal, kegiatan, status)
-        VALUES (:id_user, :tanggal, :kegiatan, 'Menunggu')
+        INSERT INTO Daily_journal (id_user, tanggal, kegiatan, bukti, status)
+        VALUES (:id_user, :tanggal, :kegiatan, :bukti, 'Menunggu')
     ");
     $stmt->execute([
         ':id_user'  => $id_user,
         ':tanggal'  => $tanggal,
         ':kegiatan' => $kegiatan,
+        ':bukti'    => $bukti_path,
     ]);
 
     header('Location: ../mahasiswa/jurnal.php?success=jurnal_disimpan'); exit();

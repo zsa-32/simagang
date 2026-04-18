@@ -13,7 +13,7 @@
 
     // Ambil semua jurnal milik mahasiswa ini
     $stmt = $conn->prepare("
-        SELECT id_journal, tanggal, kegiatan, status, catatan_dosen
+        SELECT id_journal, tanggal, kegiatan, bukti, status, catatan_dosen
         FROM Daily_journal
         WHERE id_user = :id_user
         ORDER BY tanggal DESC
@@ -126,7 +126,8 @@
                                 <tr class="bg-white border-b border-gray-200 text-gray-500 text-[12px] uppercase tracking-wider">
                                     <th class="px-8 py-5 font-semibold w-14">No</th>
                                     <th class="px-6 py-5 font-semibold w-36 text-center">Tanggal</th>
-                                    <th class="px-6 py-5 font-semibold">Kegiatan</th>
+                                    <th class="px-6 py-5 font-semibold">Judul</th>
+                                    <th class="px-6 py-5 font-semibold text-center w-24">Bukti</th>
                                     <th class="px-6 py-5 font-semibold text-center w-32">Status</th>
                                     <th class="px-8 py-5 font-semibold text-center w-24">Aksi</th>
                                 </tr>
@@ -167,13 +168,27 @@
                                                 <p class="font-semibold text-gray-800 text-[14px]"><?= $judul ?></p>
                                                 <p class="text-[12px] text-gray-400 mt-0.5 line-clamp-1"><?= $deskripsi ?></p>
                                             </td>
+                                            <!-- Kolom Bukti -->
+                                            <td class="px-6 py-5 text-center">
+                                                <?php if (!empty($j['bukti'])): ?>
+                                                    <a href="../<?= htmlspecialchars($j['bukti']) ?>" target="_blank"
+                                                       title="Lihat Bukti"
+                                                       class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-500 hover:bg-indigo-100 hover:border-indigo-300 transition-all">
+                                                        <i class="fas fa-image text-[14px]"></i>
+                                                    </a>
+                                                <?php else: ?>
+                                                    <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-gray-50 border border-gray-100 text-gray-300" title="Tidak ada bukti">
+                                                        <i class="fas fa-image text-[14px]"></i>
+                                                    </span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td class="px-6 py-5 text-center">
                                                 <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold <?= $badge ?>">
                                                     <i class="fas <?= $icon ?> text-[10px]"></i> <?= $j['status'] ?>
                                                 </span>
                                             </td>
                                             <td class="px-8 py-5 text-center">
-                                                <button onclick="openDetail(<?= $j['id_journal'] ?>, `<?= addslashes($judul) ?>`, `<?= addslashes($deskripsi) ?>`, `<?= $j['tanggal'] ?>`, `<?= $j['status'] ?>`, `<?= addslashes($j['catatan_dosen'] ?? '') ?>`)"
+                                                <button onclick="openDetail(<?= $j['id_journal'] ?>, `<?= addslashes($judul) ?>`, `<?= addslashes($deskripsi) ?>`, `<?= $j['tanggal'] ?>`, `<?= $j['status'] ?>`, `<?= addslashes($j['catatan_dosen'] ?? '') ?>`, `<?= addslashes($j['bukti'] ?? '') ?>`)"
                                                     class="text-blue-600 hover:text-blue-800 bg-blue-50/50 hover:bg-blue-100 border border-blue-100 p-2.5 rounded-[8px] transition-all">
                                                     <i class="fas fa-eye text-[14px]"></i>
                                                 </button>
@@ -219,6 +234,22 @@
                     <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Deskripsi</p>
                     <p id="detailDeskripsi" class="text-[14px] text-gray-700 leading-relaxed whitespace-pre-line"></p>
                 </div>
+                <!-- Bukti Kegiatan -->
+                <div id="buktiWrap" class="hidden">
+                    <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Bukti Kegiatan</p>
+                    <a id="buktiLink" href="#" target="_blank"
+                       class="group block overflow-hidden rounded-xl border border-gray-200 bg-gray-50 hover:border-indigo-300 transition-all">
+                        <img id="buktiImg" src="#" alt="Bukti Jurnal"
+                             class="w-full max-h-48 object-contain bg-gray-50">
+                        <div class="flex items-center gap-2 px-3 py-2 border-t border-gray-100 text-[12px] text-indigo-600 font-medium group-hover:bg-indigo-50 transition-colors">
+                            <i class="fas fa-external-link-alt text-[11px]"></i> Buka gambar penuh
+                        </div>
+                    </a>
+                </div>
+                <div id="noBuktiWrap" class="hidden">
+                    <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Bukti Kegiatan</p>
+                    <p class="text-[13px] text-gray-400 italic">Tidak ada bukti yang dilampirkan.</p>
+                </div>
                 <div>
                     <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Status</p>
                     <span id="detailStatus" class="px-3 py-1 rounded-full text-[12px] font-semibold"></span>
@@ -235,7 +266,7 @@
     </div>
 
     <script>
-        function openDetail(id, judul, deskripsi, tanggal, status, catatan) {
+        function openDetail(id, judul, deskripsi, tanggal, status, catatan, bukti) {
             document.getElementById('detailTanggal').textContent   = tanggal;
             document.getElementById('detailJudul').textContent     = judul;
             document.getElementById('detailDeskripsi').textContent = deskripsi;
@@ -244,6 +275,20 @@
             const badges = { 'Disetujui': 'bg-green-100 text-green-700', 'Ditolak': 'bg-red-100 text-red-600', 'Menunggu': 'bg-amber-100 text-amber-600' };
             statusEl.className = 'px-3 py-1 rounded-full text-[12px] font-semibold ' + (badges[status] || badges['Menunggu']);
             statusEl.textContent = status;
+
+            // Tampilkan bukti
+            const buktiWrap   = document.getElementById('buktiWrap');
+            const noBuktiWrap = document.getElementById('noBuktiWrap');
+            if (bukti) {
+                const baseUrl = window.location.origin + '/simagang/';
+                document.getElementById('buktiImg').src  = baseUrl + bukti;
+                document.getElementById('buktiLink').href = baseUrl + bukti;
+                buktiWrap.classList.remove('hidden');
+                noBuktiWrap.classList.add('hidden');
+            } else {
+                buktiWrap.classList.add('hidden');
+                noBuktiWrap.classList.remove('hidden');
+            }
 
             const catatanWrap = document.getElementById('catatanWrap');
             if (catatan) {

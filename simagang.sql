@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Apr 17, 2026 at 02:16 PM
+-- Generation Time: Apr 18, 2026 at 11:21 AM
 -- Server version: 8.0.30
 -- PHP Version: 8.1.10
 
@@ -43,7 +43,8 @@ CREATE TABLE `attendances` (
 
 INSERT INTO `attendances` (`id_attendance`, `id_user`, `tanggal`, `waktu_masuk`, `waktu_keluar`, `status`, `keterangan`) VALUES
 (1, 4, '2026-04-16', '08:15:00', '17:00:00', 'Hadir', 'Tugas di kantor pusat'),
-(2, 4, '2026-04-17', '09:28:06', NULL, NULL, 'Hadir');
+(2, 4, '2026-04-17', '09:28:06', NULL, NULL, 'Hadir'),
+(5, 6, '2026-04-18', '09:51:47', NULL, NULL, 'Hadir');
 
 -- --------------------------------------------------------
 
@@ -96,6 +97,7 @@ CREATE TABLE `daily_journal` (
   `id_user` int DEFAULT NULL,
   `tanggal` date DEFAULT NULL,
   `kegiatan` text,
+  `bukti` varchar(255) DEFAULT NULL,
   `status` enum('Menunggu','Disetujui','Ditolak') NOT NULL DEFAULT 'Menunggu',
   `catatan_dosen` text
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
@@ -104,8 +106,10 @@ CREATE TABLE `daily_journal` (
 -- Dumping data for table `daily_journal`
 --
 
-INSERT INTO `daily_journal` (`id_journal`, `id_user`, `tanggal`, `kegiatan`, `status`, `catatan_dosen`) VALUES
-(1, 4, '2026-04-16', 'Melakukan testing pada modul autentikasi user.', 'Disetujui', 'Bagus, lanjutkan!');
+INSERT INTO `daily_journal` (`id_journal`, `id_user`, `tanggal`, `kegiatan`, `bukti`, `status`, `catatan_dosen`) VALUES
+(1, 4, '2026-04-16', 'Melakukan testing pada modul autentikasi user.', NULL, 'Disetujui', 'Bagus, lanjutkan!'),
+(3, 6, '2026-04-18', 'tes\n\ntes123', NULL, 'Disetujui', NULL),
+(4, 6, '2026-04-18', 'tes\n\n123', 'assets/uploads/jurnal/jurnal_6_20260418_100120.png', 'Menunggu', NULL);
 
 -- --------------------------------------------------------
 
@@ -185,20 +189,21 @@ CREATE TABLE `profile` (
   `dosen_pembimbing` varchar(150) DEFAULT NULL,
   `id_dosen_pembimbing` int DEFAULT NULL,
   `foto` varchar(255) DEFAULT NULL,
-  `posisi_magang` varchar(100) DEFAULT NULL
+  `posisi_magang` varchar(100) DEFAULT NULL,
+  `id_pembimbing_lapang` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 --
 -- Dumping data for table `profile`
 --
 
-INSERT INTO `profile` (`id_profile`, `id_user`, `nip`, `nim`, `no_hp`, `alamat`, `prodi`, `semester`, `nama_perusahaan`, `dosen_pembimbing`, `id_dosen_pembimbing`, `foto`, `posisi_magang`) VALUES
-(1, 4, NULL, '21000123', '081234567890', 'Jl. Teknik No. 5, Surabaya', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(2, NULL, '12345678', NULL, '0987654321', 'jalan karimata', NULL, NULL, NULL, NULL, 1, NULL, NULL),
-(3, 2, '19850101', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(4, 5, NULL, 'E41251539', NULL, NULL, 'Teknik informatika', 7, NULL, NULL, NULL, NULL, NULL),
-(5, 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(6, 3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+INSERT INTO `profile` (`id_profile`, `id_user`, `nip`, `nim`, `no_hp`, `alamat`, `prodi`, `semester`, `nama_perusahaan`, `dosen_pembimbing`, `id_dosen_pembimbing`, `foto`, `posisi_magang`, `id_pembimbing_lapang`) VALUES
+(1, 4, NULL, '21000123', '081234567890', 'Jl. Teknik No. 5, Surabaya', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(2, NULL, '12345678', NULL, '0987654321', 'jalan karimata', NULL, NULL, NULL, NULL, 1, NULL, NULL, NULL),
+(3, 2, '19850101', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(5, 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(6, 3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(7, 6, NULL, 'E41251539', NULL, NULL, NULL, NULL, NULL, NULL, 2, NULL, NULL, 3);
 
 -- --------------------------------------------------------
 
@@ -269,7 +274,7 @@ INSERT INTO `users` (`id_user`, `nama`, `email`, `password`) VALUES
 (2, 'Dr. Aris Sudarsono', 'aris@univ.ac.id', 'dosen123'),
 (3, 'Bapak Eko Tech', 'eko@company.com', 'lapang123'),
 (4, 'Rizky Pratama', 'rizky@student.com', 'mhs123'),
-(5, 'zal', 'E41251539@student.polije.ac.id', '$2y$10$wWHavpjej091G19cdh/Df.zS/H69QXIZ6dcJaSi60CXT9J.02K8vy');
+(6, 'zal', 'E41251539@student.polije.ac.id', '$2y$10$UuwPHPz6MxMuCfQBb85Wa.Z6NjBhKTPDI5WK7jmqphfdDOohEJxzu');
 
 -- --------------------------------------------------------
 
@@ -292,7 +297,7 @@ INSERT INTO `users_role` (`id_user_role`, `id_user`, `id_role`) VALUES
 (2, 2, 2),
 (3, 3, 3),
 (4, 4, 4),
-(5, 5, 4);
+(6, 6, 4);
 
 --
 -- Indexes for dumped tables
@@ -346,7 +351,8 @@ ALTER TABLE `internship_placement`
 --
 ALTER TABLE `profile`
   ADD PRIMARY KEY (`id_profile`),
-  ADD UNIQUE KEY `id_user` (`id_user`);
+  ADD UNIQUE KEY `id_user` (`id_user`),
+  ADD KEY `profile_ibfk_pembimbing` (`id_pembimbing_lapang`);
 
 --
 -- Indexes for table `reports`
@@ -391,7 +397,7 @@ ALTER TABLE `users_role`
 -- AUTO_INCREMENT for table `attendances`
 --
 ALTER TABLE `attendances`
-  MODIFY `id_attendance` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id_attendance` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `attendance_validation`
@@ -409,7 +415,7 @@ ALTER TABLE `company`
 -- AUTO_INCREMENT for table `daily_journal`
 --
 ALTER TABLE `daily_journal`
-  MODIFY `id_journal` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id_journal` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `final_evaluation`
@@ -451,13 +457,13 @@ ALTER TABLE `roles_permissions`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id_user` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id_user` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `users_role`
 --
 ALTER TABLE `users_role`
-  MODIFY `id_user_role` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id_user_role` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- Constraints for dumped tables
@@ -499,7 +505,9 @@ ALTER TABLE `internship_placement`
 -- Constraints for table `profile`
 --
 ALTER TABLE `profile`
-  ADD CONSTRAINT `profile_ibfk_1` FOREIGN KEY (`id_user`) REFERENCES `users` (`id_user`);
+  ADD CONSTRAINT `profile_ibfk_1` FOREIGN KEY (`id_user`) REFERENCES `users` (`id_user`),
+  ADD CONSTRAINT `profile_ibfk_2` FOREIGN KEY (`id_pembimbing_lapang`) REFERENCES `users` (`id_user`),
+  ADD CONSTRAINT `profile_ibfk_pembimbing` FOREIGN KEY (`id_pembimbing_lapang`) REFERENCES `users` (`id_user`);
 
 --
 -- Constraints for table `reports`

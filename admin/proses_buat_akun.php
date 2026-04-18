@@ -14,11 +14,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // Ambil & sanitasi input
-$nama         = trim($_POST['nama']       ?? '');
-$email        = trim($_POST['email']      ?? '');
-$role         = trim($_POST['role']       ?? '');
-$nomor_induk  = trim($_POST['nomor_induk']?? '');
-$password     = trim($_POST['password']   ?? '');
+$nama                  = trim($_POST['nama']                 ?? '');
+$email                 = trim($_POST['email']                ?? '');
+$role                  = trim($_POST['role']                 ?? '');
+$nomor_induk           = trim($_POST['nomor_induk']          ?? '');
+$password              = trim($_POST['password']             ?? '');
+$id_dosen_pembimbing   = (int) ($_POST['id_dosen_pembimbing'] ?? 0) ?: null;
+$id_pembimbing_lapang  = (int) ($_POST['id_pembimbing_lapang'] ?? 0) ?: null;
 
 // Validasi dasar
 if (empty($nama) || empty($email) || empty($role) || empty($password)) {
@@ -79,13 +81,20 @@ try {
     $nim = ($id_role === 4 && !empty($nomor_induk)) ? $nomor_induk : null;   // Mahasiswa
     $nip = ($id_role !== 4 && !empty($nomor_induk)) ? $nomor_induk : null;   // Non-mahasiswa
 
+    // Hanya simpan relasi dosen & pembimbing jika role = Mahasiswa
+    $dosenRel    = ($id_role === 4) ? $id_dosen_pembimbing  : null;
+    $pembimbingRel = ($id_role === 4) ? $id_pembimbing_lapang : null;
+
     $stmtProfile = $conn->prepare(
-        "INSERT INTO Profile (id_user, nim, nip) VALUES (:id_user, :nim, :nip)"
+        "INSERT INTO Profile (id_user, nim, nip, id_dosen_pembimbing, id_pembimbing_lapang)
+         VALUES (:id_user, :nim, :nip, :id_dosen, :id_pembimbing)"
     );
     $stmtProfile->execute([
-        ':id_user' => $newId,
-        ':nim'     => $nim,
-        ':nip'     => $nip,
+        ':id_user'      => $newId,
+        ':nim'          => $nim,
+        ':nip'          => $nip,
+        ':id_dosen'     => $dosenRel,
+        ':id_pembimbing'=> $pembimbingRel,
     ]);
 
     header('Location: manajemen_user.php?success=akun_dibuat');
