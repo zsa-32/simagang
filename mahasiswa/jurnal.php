@@ -123,13 +123,14 @@
                     <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse min-w-[700px]">
                             <thead>
-                                <tr class="bg-white border-b border-gray-200 text-gray-500 text-[12px] uppercase tracking-wider">
-                                    <th class="px-8 py-5 font-semibold w-14">No</th>
-                                    <th class="px-6 py-5 font-semibold w-36 text-center">Tanggal</th>
-                                    <th class="px-6 py-5 font-semibold">Judul</th>
-                                    <th class="px-6 py-5 font-semibold text-center w-24">Bukti</th>
-                                    <th class="px-6 py-5 font-semibold text-center w-32">Status</th>
-                                    <th class="px-8 py-5 font-semibold text-center w-24">Aksi</th>
+                                <tr class="bg-white border-b border-gray-100 text-gray-500 text-[11px] uppercase tracking-widest">
+                                    <th class="px-8 py-5 font-bold w-16 text-center">No</th>
+                                    <th class="px-6 py-5 font-bold w-40 text-center">Tanggal</th>
+                                    <th class="px-6 py-5 font-bold">Judul</th>
+                                    <th class="px-6 py-5 font-bold text-center w-28">Bukti</th>
+                                    <th class="px-6 py-5 font-bold text-center w-36">Kegiatan</th>
+                                    <th class="px-6 py-5 font-bold text-center w-32">Status</th>
+                                    <th class="px-8 py-5 font-bold text-center w-24">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody class="text-[14px] text-gray-600 divide-y divide-gray-100">
@@ -156,41 +157,43 @@
 
                                         $tgl = new DateTime($j['tanggal']);
                                     ?>
-                                        <tr class="hover:bg-gray-50/50 transition-colors">
-                                            <td class="px-8 py-5 text-gray-500"><?= $no + 1 ?></td>
-                                            <td class="px-6 py-5 text-center">
-                                                <div class="inline-flex flex-col items-center">
-                                                    <span class="font-medium text-gray-800 text-[14px]"><?= $tgl->format('d M') ?></span>
-                                                    <span class="text-[12px] text-gray-500 mt-0.5"><?= $tgl->format('Y') ?></span>
+                                        <tr class="hover:bg-gray-50/80 transition-colors border-b border-gray-50">
+                                            <td class="px-8 py-7 text-gray-500 text-center"><?= $no + 1 ?></td>
+                                            <td class="px-6 py-7 text-center">
+                                                <div class="flex flex-col items-center">
+                                                    <span class="font-bold text-gray-800 text-[14px]"><?= $tgl->format('d M') ?></span>
+                                                    <span class="text-[12px] text-gray-400 font-medium"><?= $tgl->format('Y') ?></span>
                                                 </div>
                                             </td>
-                                            <td class="px-6 py-5">
-                                                <p class="font-semibold text-gray-800 text-[14px]"><?= $judul ?></p>
-                                                <p class="text-[12px] text-gray-400 mt-0.5 line-clamp-1"><?= $deskripsi ?></p>
+                                            <td class="px-6 py-7">
+                                                <p class="font-bold text-gray-800 text-[15px]"><?= $judul ?></p>
                                             </td>
                                             <!-- Kolom Bukti -->
-                                            <td class="px-6 py-5 text-center">
+                                            <td class="px-6 py-7 text-center">
                                                 <?php if (!empty($j['bukti'])): ?>
                                                     <a href="../<?= htmlspecialchars($j['bukti']) ?>" target="_blank"
                                                        title="Lihat Bukti"
-                                                       class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-500 hover:bg-indigo-100 hover:border-indigo-300 transition-all">
-                                                        <i class="fas fa-image text-[14px]"></i>
+                                                       class="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-all">
+                                                        <i class="fas fa-image text-[16px]"></i>
                                                     </a>
                                                 <?php else: ?>
-                                                    <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-gray-50 border border-gray-100 text-gray-300" title="Tidak ada bukti">
-                                                        <i class="fas fa-image text-[14px]"></i>
+                                                    <span class="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-gray-50 text-gray-200" title="Tidak ada bukti">
+                                                        <i class="fas fa-image text-[16px]"></i>
                                                     </span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td class="px-6 py-5 text-center">
-                                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold <?= $badge ?>">
+                                            <td class="px-6 py-7">
+                                                <p class="text-[13px] text-gray-500 leading-relaxed line-clamp-2 max-w-[300px] mx-auto text-center"><?= $deskripsi ?></p>
+                                            </td>
+                                            <td class="px-6 py-7 text-center">
+                                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide <?= $badge ?>">
                                                     <i class="fas <?= $icon ?> text-[10px]"></i> <?= $j['status'] ?>
                                                 </span>
                                             </td>
-                                            <td class="px-8 py-5 text-center">
+                                            <td class="px-8 py-7 text-center">
                                                 <button onclick="openDetail(<?= $j['id_journal'] ?>, `<?= addslashes($judul) ?>`, `<?= addslashes($deskripsi) ?>`, `<?= $j['tanggal'] ?>`, `<?= $j['status'] ?>`, `<?= addslashes($j['catatan_dosen'] ?? '') ?>`, `<?= addslashes($j['bukti'] ?? '') ?>`)"
-                                                    class="text-blue-600 hover:text-blue-800 bg-blue-50/50 hover:bg-blue-100 border border-blue-100 p-2.5 rounded-[8px] transition-all">
-                                                    <i class="fas fa-eye text-[14px]"></i>
+                                                    class="inline-flex items-center justify-center w-10 h-10 rounded-full text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-all">
+                                                    <i class="fas fa-eye text-[16px]"></i>
                                                 </button>
                                             </td>
                                         </tr>
