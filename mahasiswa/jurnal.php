@@ -123,77 +123,90 @@
                     <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse min-w-[700px]">
                             <thead>
-                                <tr class="bg-white border-b border-gray-100 text-gray-500 text-[11px] uppercase tracking-widest">
-                                    <th class="px-8 py-5 font-bold w-16 text-center">No</th>
-                                    <th class="px-6 py-5 font-bold w-40 text-center">Tanggal</th>
-                                    <th class="px-6 py-5 font-bold">Judul</th>
-                                    <th class="px-6 py-5 font-bold text-center w-28">Bukti</th>
-                                    <th class="px-6 py-5 font-bold text-center w-36">Kegiatan</th>
-                                    <th class="px-6 py-5 font-bold text-center w-32">Status</th>
-                                    <th class="px-8 py-5 font-bold text-center w-24">Aksi</th>
+                                <tr class="bg-white border-b border-gray-100 text-gray-400 text-[12px] font-semibold">
+                                    <th class="px-6 py-4 font-semibold w-14 text-center">No</th>
+                                    <th class="px-6 py-4 font-semibold w-36 text-center">Tanggal</th>
+                                    <th class="px-6 py-4 font-semibold text-center">Judul</th>
+                                    <th class="px-6 py-4 font-semibold text-center w-24">Bukti</th>
+                                    <th class="px-6 py-4 font-semibold text-center">Kegiatan</th>
+                                    <th class="px-6 py-4 font-semibold text-center w-32">Status</th>
+                                    <th class="px-6 py-4 font-semibold text-center w-20">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody class="text-[14px] text-gray-600 divide-y divide-gray-100">
                                 <?php if (empty($jurnal_list)): ?>
                                     <tr>
-                                        <td colspan="5" class="px-8 py-12 text-center text-gray-400">
+                                        <td colspan="7" class="px-8 py-12 text-center text-gray-400">
                                             <i class="fas fa-book-open text-3xl mb-3 block"></i>
                                             Belum ada jurnal. <a href="tambahjurnal.php" class="text-blue-600 hover:underline">Tambah sekarang</a>.
                                         </td>
                                     </tr>
                                 <?php else: ?>
-                                    <?php foreach ($jurnal_list as $no => $j):
-                                        // Pisah judul & deskripsi (disimpan dengan \n\n sebagai separator)
-                                        $parts    = explode("\n\n", $j['kegiatan'], 2);
-                                        $judul    = htmlspecialchars($parts[0]);
-                                        $deskripsi= htmlspecialchars($parts[1] ?? '');
-
-                                        $statusConf = match($j['status']) {
-                                            'Disetujui' => ['bg-green-100 text-green-700', 'fa-check-circle'],
-                                            'Ditolak'   => ['bg-red-100 text-red-600',   'fa-times-circle'],
-                                            default     => ['bg-amber-100 text-amber-600','fa-clock'],
-                                        };
-                                        [$badge, $icon] = $statusConf;
-
-                                        $tgl = new DateTime($j['tanggal']);
+                                    <?php
+                                        // Pagination setup
+                                        $perPage     = 5;
+                                        $currentPage = max(1, (int)($_GET['page'] ?? 1));
+                                        $totalPages  = max(1, (int)ceil($totalJurnal / $perPage));
+                                        $currentPage = min($currentPage, $totalPages);
+                                        $offset      = ($currentPage - 1) * $perPage;
+                                        $pagedList   = array_slice($jurnal_list, $offset, $perPage);
+                                        $startNo     = $offset + 1;
+                                        $endNo       = min($offset + $perPage, $totalJurnal);
+                                    ?>
+                                    <?php foreach ($pagedList as $no => $j):
+                                        $parts     = explode("\n\n", $j['kegiatan'], 2);
+                                        $judul     = htmlspecialchars($parts[0]);
+                                        $deskripsi = htmlspecialchars($parts[1] ?? '');
+                                        $tgl       = new DateTime($j['tanggal']);
                                     ?>
                                         <tr class="hover:bg-gray-50/80 transition-colors border-b border-gray-50">
-                                            <td class="px-8 py-7 text-gray-500 text-center"><?= $no + 1 ?></td>
-                                            <td class="px-6 py-7 text-center">
+                                            <td class="px-6 py-5 text-gray-500 text-center text-[14px]"><?= $offset + $no + 1 ?></td>
+                                            <td class="px-6 py-5 text-center">
                                                 <div class="flex flex-col items-center">
-                                                    <span class="font-bold text-gray-800 text-[14px]"><?= $tgl->format('d M') ?></span>
-                                                    <span class="text-[12px] text-gray-400 font-medium"><?= $tgl->format('Y') ?></span>
+                                                    <span class="font-semibold text-gray-800 text-[14px]"><?= $tgl->format('d M') ?></span>
+                                                    <span class="text-[12px] text-gray-400"><?= $tgl->format('Y') ?></span>
                                                 </div>
                                             </td>
-                                            <td class="px-6 py-7">
-                                                <p class="font-bold text-gray-800 text-[15px]"><?= $judul ?></p>
+                                            <td class="px-6 py-5 text-center">
+                                                <p class="font-bold text-gray-800 text-[14px]"><?= $judul ?></p>
                                             </td>
                                             <!-- Kolom Bukti -->
-                                            <td class="px-6 py-7 text-center">
+                                            <td class="px-6 py-5 text-center">
                                                 <?php if (!empty($j['bukti'])): ?>
                                                     <a href="../<?= htmlspecialchars($j['bukti']) ?>" target="_blank"
                                                        title="Lihat Bukti"
-                                                       class="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-all">
-                                                        <i class="fas fa-image text-[16px]"></i>
+                                                       class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-all">
+                                                        <i class="fas fa-image text-[15px]"></i>
                                                     </a>
                                                 <?php else: ?>
-                                                    <span class="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-gray-50 text-gray-200" title="Tidak ada bukti">
-                                                        <i class="fas fa-image text-[16px]"></i>
+                                                    <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gray-50 text-gray-300" title="Tidak ada bukti">
+                                                        <i class="fas fa-image text-[15px]"></i>
                                                     </span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td class="px-6 py-7">
-                                                <p class="text-[13px] text-gray-500 leading-relaxed line-clamp-2 max-w-[300px] mx-auto text-center"><?= $deskripsi ?></p>
+                                            <td class="px-6 py-5">
+                                                <p class="text-[13px] text-gray-500 leading-relaxed line-clamp-3 max-w-[320px] mx-auto text-center"><?= $deskripsi ?></p>
                                             </td>
-                                            <td class="px-6 py-7 text-center">
-                                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide <?= $badge ?>">
-                                                    <i class="fas <?= $icon ?> text-[10px]"></i> <?= $j['status'] ?>
+                                            <!-- Kolom Status Verifikasi -->
+                                            <td class="px-6 py-5 text-center">
+                                                <?php
+                                                    $statusConf = match($j['status']) {
+                                                        'Disetujui' => ['bg-green-100 text-green-700 border border-green-200', 'fa-check-circle', 'Disetujui'],
+                                                        'Ditolak'   => ['bg-red-100 text-red-600 border border-red-200',     'fa-times-circle', 'Ditolak'],
+                                                        default     => ['bg-amber-100 text-amber-600 border border-amber-200','fa-clock',        'Menunggu'],
+                                                    };
+                                                    [$badge, $icon, $label] = $statusConf;
+                                                ?>
+                                                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold <?= $badge ?>">
+                                                    <i class="fas <?= $icon ?> text-[11px]"></i>
+                                                    <?= $label ?>
                                                 </span>
                                             </td>
-                                            <td class="px-8 py-7 text-center">
+                                            <!-- Kolom Aksi -->
+                                            <td class="px-6 py-5 text-center">
                                                 <button onclick="openDetail(<?= $j['id_journal'] ?>, `<?= addslashes($judul) ?>`, `<?= addslashes($deskripsi) ?>`, `<?= $j['tanggal'] ?>`, `<?= $j['status'] ?>`, `<?= addslashes($j['catatan_dosen'] ?? '') ?>`, `<?= addslashes($j['bukti'] ?? '') ?>`)"
-                                                    class="inline-flex items-center justify-center w-10 h-10 rounded-full text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-all">
-                                                    <i class="fas fa-eye text-[16px]"></i>
+                                                    class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-sm">
+                                                    <i class="fas fa-eye text-[14px]"></i>
                                                 </button>
                                             </td>
                                         </tr>
@@ -204,10 +217,52 @@
                     </div>
 
                     <!-- Pagination Footer -->
-                    <div class="px-6 py-5 md:px-8 border-t border-gray-100 flex items-center justify-between bg-gray-50/50 rounded-b-2xl">
+                    <div class="px-6 py-4 md:px-8 border-t border-gray-100 flex items-center justify-between bg-white rounded-b-2xl">
                         <div class="text-[13px] text-gray-500">
-                            Total <span class="font-semibold text-gray-700"><?= $totalJurnal ?></span> jurnal
+                            <?php if ($totalJurnal > 0): ?>
+                                Menampilkan <span class="font-semibold text-gray-700"><?= $startNo ?></span> sampai
+                                <span class="font-semibold text-gray-700"><?= $endNo ?></span> dari
+                                <span class="font-semibold text-gray-700"><?= $totalJurnal ?></span> hasil
+                            <?php else: ?>
+                                Tidak ada data
+                            <?php endif; ?>
                         </div>
+                        <?php if ($totalPages > 1): ?>
+                        <div class="flex items-center gap-1">
+                            <!-- Previous -->
+                            <a href="?page=<?= max(1, $currentPage - 1) ?>"
+                               class="px-3 py-1.5 rounded-lg border border-gray-200 text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors <?= $currentPage <= 1 ? 'opacity-40 pointer-events-none' : '' ?>">
+                                Previous
+                            </a>
+                            <!-- Page Numbers -->
+                            <?php
+                                $range = 2;
+                                $start = max(1, $currentPage - $range);
+                                $end   = min($totalPages, $currentPage + $range);
+                                if ($start > 1): ?>
+                                    <a href="?page=1" class="px-3 py-1.5 rounded-lg border border-gray-200 text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors">1</a>
+                                    <?php if ($start > 2): ?><span class="px-1 text-gray-400">...</span><?php endif; ?>
+                            <?php endif;
+                                for ($p = $start; $p <= $end; $p++): ?>
+                                    <a href="?page=<?= $p ?>"
+                                       class="px-3 py-1.5 rounded-lg border text-[13px] font-medium transition-colors
+                                              <?= $p === $currentPage
+                                                    ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                                                    : 'border-gray-200 text-gray-600 hover:bg-gray-50' ?>">
+                                        <?= $p ?>
+                                    </a>
+                            <?php endfor;
+                                if ($end < $totalPages): ?>
+                                    <?php if ($end < $totalPages - 1): ?><span class="px-1 text-gray-400">...</span><?php endif; ?>
+                                    <a href="?page=<?= $totalPages ?>" class="px-3 py-1.5 rounded-lg border border-gray-200 text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors"><?= $totalPages ?></a>
+                            <?php endif; ?>
+                            <!-- Next -->
+                            <a href="?page=<?= min($totalPages, $currentPage + 1) ?>"
+                               class="px-3 py-1.5 rounded-lg border border-gray-200 text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors <?= $currentPage >= $totalPages ? 'opacity-40 pointer-events-none' : '' ?>">
+                                Next
+                            </a>
+                        </div>
+                        <?php endif; ?>
                     </div>
                     
                 </div>

@@ -10,7 +10,13 @@ $role = 'admin';
 $activePage = 'monitoring_mahasiswa';
 $today = date('Y-m-d');
 
-// Presensi semua mahasiswa hari ini
+// Filter tanggal dari GET, default hari ini
+$selectedDate = (isset($_GET['tanggal']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['tanggal']))
+    ? $_GET['tanggal']
+    : $today;
+$isToday = ($selectedDate === $today);
+
+// Presensi semua mahasiswa berdasarkan tanggal yang dipilih
 $stmtP = $conn->prepare("
     SELECT u.nama, p.nim,
            c.nama_company AS perusahaan,
@@ -19,25 +25,25 @@ $stmtP = $conn->prepare("
     JOIN Profile p ON u.id_user = p.id_user
     LEFT JOIN Internship_placement ip ON u.id_user = ip.id_user
     LEFT JOIN Company c ON ip.id_company = c.id_company
-    LEFT JOIN Attendances a ON a.id_user = u.id_user AND a.tanggal = :today
+    LEFT JOIN Attendances a ON a.id_user = u.id_user AND a.tanggal = :tgl
     JOIN Users_role ur ON u.id_user = ur.id_user
     JOIN Roles r ON ur.id_role = r.id_role
     WHERE LOWER(r.nama_role) = 'mahasiswa'
     ORDER BY u.nama ASC
 ");
-$stmtP->execute([':today' => $today]);
+$stmtP->execute([':tgl' => $selectedDate]);
 $presensiList = $stmtP->fetchAll();
 
 // Jurnal semua mahasiswa
 $stmtJ = $conn->prepare("
-    SELECT u.nama, p.nim, dj.kegiatan, dj.tanggal, dj.status
+    SELECT u.nama, p.nim, dj.kegiatan, dj.tanggal, dj.status, dj.bukti
     FROM Daily_journal dj
     JOIN Users u ON dj.id_user = u.id_user
     JOIN Profile p ON u.id_user = p.id_user
+    WHERE dj.tanggal = :tgl
     ORDER BY dj.tanggal DESC
-    LIMIT 100
 ");
-$stmtJ->execute();
+$stmtJ->execute([':tgl' => $selectedDate]);
 $jurnalList = $stmtJ->fetchAll();
 
 // Hitung stats
@@ -86,18 +92,36 @@ $statusColors = [
             <div class="max-w-[1200px] mx-auto space-y-6">
 
                 <!-- Page Heading -->
-                <div class="flex items-start justify-between">
+                <div class="flex items-start justify-between flex-wrap gap-3">
                     <div>
                         <h2 class="text-2xl font-bold text-gray-900">Monitoring Mahasiswa</h2>
-                        <p class="text-gray-500 text-sm mt-0.5">Pantau presensi dan jurnal harian seluruh mahasiswa magang</p>
+                        <p class="text-gray-500 text-sm mt-0.5">
+                            Presensi &amp; jurnal tanggal
+                            <span class="font-semibold text-gray-700">
+                                <?= (new DateTime($selectedDate))->format('d M Y') ?>
+                            </span>
+                            <?php if ($isToday): ?>
+                                <span class="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-600">Hari Ini</span>
+                            <?php endif; ?>
+                        </p>
                     </div>
                     <div class="flex items-center gap-3 shrink-0">
-                        <button class="flex items-center gap-2 px-4 py-2.5 border border-gray-200 bg-white rounded-xl text-[13px] font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm">
-                            <i class="fas fa-calendar text-gray-400 text-[12px]"></i> 04 Maret 2026
-                        </button>
-                        <button class="flex items-center gap-2 px-4 py-2.5 border border-gray-200 bg-white rounded-xl text-[13px] font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm">
-                            <i class="fas fa-download text-gray-500 text-[12px]"></i> Export
-                        </button>
+                        <!-- Date Picker Filter -->
+                        <form method="GET" id="formTanggal" class="flex items-center gap-2">
+                            <label class="flex items-center gap-2 px-3 py-2 border border-gray-200 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-calendar text-gray-400 text-[12px]"></i>
+                                <input type="date" name="tanggal" id="inputTanggal"
+                                       value="<?= htmlspecialchars($selectedDate) ?>"
+                                       max="<?= $today ?>"
+                                       class="text-[13px] font-medium text-gray-700 bg-transparent outline-none cursor-pointer"
+                                       onchange="document.getElementById('formTanggal').submit()">
+                            </label>
+                            <?php if (!$isToday): ?>
+                                <a href="?" class="flex items-center gap-1.5 px-3 py-2 border border-gray-200 bg-white rounded-xl text-[12px] font-medium text-gray-500 hover:bg-gray-50 transition-colors shadow-sm" title="Kembali ke hari ini">
+                                    <i class="fas fa-rotate-left text-[11px]"></i> Hari Ini
+                                </a>
+                            <?php endif; ?>
+                        </form>
                     </div>
                 </div>
 
@@ -187,12 +211,13 @@ $statusColors = [
                                     <th class="text-left text-[12px] font-semibold text-gray-500 uppercase tracking-wider px-6 py-3.5">Mahasiswa</th>
                                     <th class="text-left text-[12px] font-semibold text-gray-500 uppercase tracking-wider px-6 py-3.5">Judul Jurnal</th>
                                     <th class="text-left text-[12px] font-semibold text-gray-500 uppercase tracking-wider px-6 py-3.5">Tanggal</th>
+                                    <th class="text-center text-[12px] font-semibold text-gray-500 uppercase tracking-wider px-6 py-3.5">Bukti</th>
                                     <th class="text-left text-[12px] font-semibold text-gray-500 uppercase tracking-wider px-6 py-3.5">Status</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-50">
                                 <?php if (empty($jurnalList)): ?>
-                                    <tr><td colspan="4" class="px-6 py-10 text-center text-gray-400"><i class="fas fa-book text-3xl mb-2 block"></i>Belum ada jurnal.</td></tr>
+                                    <tr><td colspan="5" class="px-6 py-10 text-center text-gray-400"><i class="fas fa-book text-3xl mb-2 block"></i>Belum ada jurnal.</td></tr>
                                 <?php else: ?>
                                 <?php
                                 $jurnalColors = [
@@ -202,13 +227,31 @@ $statusColors = [
                                 ];
                                 foreach ($jurnalList as $j):
                                 ?>
-                                <tr class="hover:bg-gray-50 transition-colors">
+                                <tr class="hover:bg-gray-50 transition-colors jurnal-row" data-search="<?= strtolower($j['nama'] . ' ' . $j['nim']) ?>">
                                     <td class="px-6 py-4">
                                         <p class="font-semibold text-gray-800 text-[14px]"><?= htmlspecialchars($j['nama']) ?></p>
                                         <p class="text-[12px] text-gray-400"><?= $j['nim'] ?></p>
                                     </td>
                                     <td class="px-6 py-4 text-[13px] text-gray-700"><?= htmlspecialchars(explode("\n", $j['kegiatan'])[0]) ?></td>
                                     <td class="px-6 py-4 text-[13px] text-gray-500"><?= date('d M Y', strtotime($j['tanggal'])) ?></td>
+                                    <!-- Kolom Bukti -->
+                                    <td class="px-6 py-4 text-center">
+                                        <?php if (!empty($j['bukti'])): ?>
+                                            <a href="../<?= htmlspecialchars($j['bukti']) ?>" target="_blank"
+                                               title="Lihat Bukti"
+                                               class="group inline-block relative">
+                                                <img src="../<?= htmlspecialchars($j['bukti']) ?>" alt="Bukti"
+                                                     class="w-10 h-10 object-cover rounded-lg border border-gray-200 shadow-sm group-hover:opacity-80 transition-opacity">
+                                                <span class="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <i class="fas fa-external-link-alt text-white text-[7px]"></i>
+                                                </span>
+                                            </a>
+                                        <?php else: ?>
+                                            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 text-gray-300" title="Tidak ada bukti">
+                                                <i class="fas fa-image text-[14px]"></i>
+                                            </span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="px-6 py-4">
                                         <span class="px-3 py-1 rounded-full text-[12px] font-semibold <?= $jurnalColors[$j['status']] ?? 'bg-gray-100 text-gray-500' ?>"><?= $j['status'] ?></span>
                                     </td>
@@ -245,7 +288,7 @@ $statusColors = [
 
         function filterRows() {
             const q = document.getElementById('searchMhs').value.toLowerCase();
-            document.querySelectorAll('.mhs-row').forEach(row => {
+            document.querySelectorAll('.mhs-row, .jurnal-row').forEach(row => {
                 row.style.display = row.dataset.search.includes(q) ? '' : 'none';
             });
         }
