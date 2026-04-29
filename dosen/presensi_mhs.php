@@ -1,20 +1,95 @@
 <?php
-    session_start();
+    require_once __DIR__ . "/../config/role_guard.php";
+    checkRole("dosen_pembimbing");
+    require_once __DIR__ . '/../config/db_connect.php';
     $role = 'dosen';
     $activePage = 'presensi';
+
+    $userId = $_SESSION['id_user'];
+    $stmt = $conn->prepare("SELECT id FROM dosen_pembimbing WHERE user_id = :uid");
+    $stmt->execute(['uid' => $userId]);
+    $dosen = $stmt->fetch();
+    $dosenId = $dosen ? $dosen['id'] : 0;
 
     // Date navigation
     $tanggal = isset($_GET['tanggal']) ? $_GET['tanggal'] : date('Y-m-d');
     $dateObj = new DateTime($tanggal);
     $prevDate = (clone $dateObj)->modify('-1 day')->format('Y-m-d');
     $nextDate = (clone $dateObj)->modify('+1 day')->format('Y-m-d');
-
-    // Indonesian days & months
     $days   = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
     $months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
     $dayName   = $days[(int)$dateObj->format('w')];
     $monthName = $months[(int)$dateObj->format('n') - 1];
     $displayDate = $dayName . ', ' . $dateObj->format('j') . ' ' . $monthName . ' ' . $dateObj->format('Y');
+
+    // Get all mahasiswa bimbingan
+    $stmt = $conn->prepare("
+        SELECT m.id, m.nama, m.no_ktm,
+               c.nama_perusahaan
+        FROM mahasiswa m
+        JOIN `groups` g ON m.group_id = g.id
+        LEFT JOIN companies c ON g.company_id = c.id
+        WHERE g.dosen_pembimbing_id = :did
+        ORDER BY m.nama
+    ");
+    $stmt->execute(['did' => $dosenId]);
+    $allMhs = $stmt->fetchAll();
+
+    // Get attendance for the selected date
+    $mhsIds = array_column($allMhs, 'id');
+    $attMap = [];
+    if (!empty($mhsIds)) {
+        $placeholders = implode(',', array_fill(0, count($mhsIds), '?'));
+        $stmt = $conn->prepare("
+            SELECT mahasiswa_id, status, checkin_time,
+                   TIME_FORMAT(checkin_time, '%H:%i') as jam_masuk
+            FROM attendances
+            WHERE mahasiswa_id IN ($placeholders) AND date = ?
+        ");
+        $params = array_merge($mhsIds, [$tanggal]);
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll() as $a) {
+            $attMap[$a['mahasiswa_id']] = $a;
+        }
+    }
+
+    // Build presences array
+    $presences = [];
+    $statHadir = 0; $statIzin = 0; $statAlpha = 0; $statBelum = 0;
+    foreach ($allMhs as $m) {
+        $att = $attMap[$m['id']] ?? null;
+        if ($att) {
+            $status = $att['status'];
+            $masuk = $att['jam_masuk'] ?? '-';
+            match($status) {
+                'Hadir', 'Terlambat' => $statHadir++,
+                'Izin', 'Sakit' => $statIzin++,
+                'Alpha' => $statAlpha++,
+                default => $statBelum++,
+            };
+        } else {
+            $status = 'Belum Absen';
+            $masuk = '-';
+            $statBelum++;
+        }
+        $presences[] = [
+            'nama' => $m['nama'],
+            'nim' => $m['no_ktm'] ?? '-',
+            'instansi' => $m['nama_perusahaan'] ?? '-',
+            'status' => $status,
+            'masuk' => $masuk,
+            'keluar' => '-',
+        ];
+    }
+
+    $statusConfig = [
+        'Hadir'       => ['icon'=>'fa-check-circle',   'class'=>'text-green-600 bg-green-50',  'text'=>'text-green-600'],
+        'Terlambat'   => ['icon'=>'fa-clock',          'class'=>'text-yellow-600 bg-yellow-50','text'=>'text-yellow-600'],
+        'Izin'        => ['icon'=>'fa-clock',          'class'=>'text-orange-500 bg-orange-50','text'=>'text-orange-500'],
+        'Sakit'       => ['icon'=>'fa-medkit',         'class'=>'text-orange-500 bg-orange-50','text'=>'text-orange-500'],
+        'Alpha'       => ['icon'=>'fa-times-circle',   'class'=>'text-red-500 bg-red-50',      'text'=>'text-red-500'],
+        'Belum Absen' => ['icon'=>'fa-question-circle','class'=>'text-gray-400 bg-gray-50',    'text'=>'text-gray-400'],
+    ];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -36,22 +111,15 @@
 
     <div class="flex-1 flex flex-col h-screen overflow-hidden">
 
-        <!-- Top Page Header Bar -->
         <div class="h-[72px] bg-white border-b border-gray-200 flex items-center justify-between px-6 md:px-8 shrink-0">
             <h1 class="text-[18px] font-bold text-gray-900">Presensi Dosen</h1>
-            <div class="flex items-center gap-4">
-                <button class="relative p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors">
-                    <i class="fas fa-bell text-[17px]"></i>
-                    <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
-                </button>
-                <?php include '../includes/header.php'; ?>
-            </div>
+            <div class="flex items-center gap-4"><?php include '../includes/header.php'; ?></div>
         </div>
 
         <main class="flex-1 overflow-y-auto p-6 md:p-8 bg-[#f8f9fa]">
             <div class="max-w-[1000px] mx-auto space-y-5">
 
-                <!-- Section Header Card -->
+                <!-- Section Header -->
                 <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h2 class="text-[16px] font-bold text-gray-800">Presensi Mahasiswa</h2>
@@ -63,71 +131,35 @@
                             <input type="text" id="searchPresensi" placeholder="Cari mahasiswa..."
                                    class="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 w-52 transition-all">
                         </div>
-                        <button class="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors text-[13px]">
-                            <i class="fas fa-filter text-[12px]"></i>
-                        </button>
                     </div>
                 </div>
 
                 <!-- Date Navigation -->
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100">
                     <div class="flex items-center justify-between px-6 py-4">
-                        <a href="?tanggal=<?= $prevDate ?>"
-                           class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors">
-                            <i class="fas fa-chevron-left text-[13px]"></i>
-                        </a>
-                        <div class="flex items-center gap-2 text-[15px] font-semibold text-gray-800">
-                            <i class="fas fa-calendar text-blue-500 text-[14px]"></i>
-                            <?= $displayDate ?>
-                        </div>
-                        <a href="?tanggal=<?= $nextDate ?>"
-                           class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors">
-                            <i class="fas fa-chevron-right text-[13px]"></i>
-                        </a>
+                        <a href="?tanggal=<?= $prevDate ?>" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors"><i class="fas fa-chevron-left text-[13px]"></i></a>
+                        <div class="flex items-center gap-2 text-[15px] font-semibold text-gray-800"><i class="fas fa-calendar text-blue-500 text-[14px]"></i> <?= $displayDate ?></div>
+                        <a href="?tanggal=<?= $nextDate ?>" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors"><i class="fas fa-chevron-right text-[13px]"></i></a>
                     </div>
                 </div>
 
-                <!-- Stats Row -->
+                <!-- Stats -->
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <!-- Hadir -->
                     <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
-                            <i class="fas fa-check-circle text-green-500 text-[18px]"></i>
-                        </div>
-                        <div>
-                            <p class="text-[12px] text-gray-500">Hadir</p>
-                            <p class="text-2xl font-bold text-gray-900">4</p>
-                        </div>
+                        <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0"><i class="fas fa-check-circle text-green-500 text-[18px]"></i></div>
+                        <div><p class="text-[12px] text-gray-500">Hadir</p><p class="text-2xl font-bold text-gray-900"><?= $statHadir ?></p></div>
                     </div>
-                    <!-- Izin -->
                     <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center shrink-0">
-                            <i class="fas fa-clock text-orange-400 text-[18px]"></i>
-                        </div>
-                        <div>
-                            <p class="text-[12px] text-gray-500">Izin</p>
-                            <p class="text-2xl font-bold text-gray-900">1</p>
-                        </div>
+                        <div class="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center shrink-0"><i class="fas fa-clock text-orange-400 text-[18px]"></i></div>
+                        <div><p class="text-[12px] text-gray-500">Izin/Sakit</p><p class="text-2xl font-bold text-gray-900"><?= $statIzin ?></p></div>
                     </div>
-                    <!-- Tidak Hadir -->
                     <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center shrink-0">
-                            <i class="fas fa-times-circle text-red-500 text-[18px]"></i>
-                        </div>
-                        <div>
-                            <p class="text-[12px] text-gray-500">Tidak Hadir</p>
-                            <p class="text-2xl font-bold text-gray-900">1</p>
-                        </div>
+                        <div class="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center shrink-0"><i class="fas fa-times-circle text-red-500 text-[18px]"></i></div>
+                        <div><p class="text-[12px] text-gray-500">Alpha</p><p class="text-2xl font-bold text-gray-900"><?= $statAlpha ?></p></div>
                     </div>
-                    <!-- Belum Absen -->
                     <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                            <i class="fas fa-question-circle text-gray-400 text-[18px]"></i>
-                        </div>
-                        <div>
-                            <p class="text-[12px] text-gray-500">Belum Absen</p>
-                            <p class="text-2xl font-bold text-gray-900">1</p>
-                        </div>
+                        <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0"><i class="fas fa-question-circle text-gray-400 text-[18px]"></i></div>
+                        <div><p class="text-[12px] text-gray-500">Belum Absen</p><p class="text-2xl font-bold text-gray-900"><?= $statBelum ?></p></div>
                     </div>
                 </div>
 
@@ -140,38 +172,20 @@
                                     <th class="text-left px-6 py-4 font-semibold">Mahasiswa</th>
                                     <th class="text-left px-6 py-4 font-semibold">Status</th>
                                     <th class="text-left px-6 py-4 font-semibold">Jam Masuk</th>
-                                    <th class="text-left px-6 py-4 font-semibold">Jam Keluar</th>
                                     <th class="text-left px-6 py-4 font-semibold">Keterangan</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
-                                <?php
-                                $presences = [
-                                    ['nama'=>'Balmond',    'nim'=>'21134341','instansi'=>'PT Telkom Indonesia', 'status'=>'Hadir',       'masuk'=>'07:45','keluar'=>'16:30','ket'=>'-'],
-                                    ['nama'=>'Lesley',     'nim'=>'20133432','instansi'=>'CV Digital Kreatif',  'status'=>'Hadir',       'masuk'=>'08:00','keluar'=>'16:15','ket'=>'-'],
-                                    ['nama'=>'Harley',     'nim'=>'22123232','instansi'=>'PT Bank BRI',         'status'=>'Belum Absen', 'masuk'=>'-',    'keluar'=>'-',   'ket'=>'-'],
-                                    ['nama'=>'Budi Santoso','nim'=>'21140004','instansi'=>'PT Astra International','status'=>'Izin',     'masuk'=>'-',    'keluar'=>'-',   'ket'=>'Sakit (Surat Dokter)'],
-                                    ['nama'=>'Joko',       'nim'=>'22130003','instansi'=>'PT Tokopedia',        'status'=>'Tidak Hadir', 'masuk'=>'-',    'keluar'=>'-',   'ket'=>'Tanpa keterangan'],
-                                    ['nama'=>'Meks Panda', 'nim'=>'22130043','instansi'=>'PT Gojek Indonesia',  'status'=>'Hadir',       'masuk'=>'07:50','keluar'=>'16:45','ket'=>'-'],
-                                    ['nama'=>'Nana',       'nim'=>'2213663', 'instansi'=>'PT Bukalapak',        'status'=>'Hadir',       'masuk'=>'07:55','keluar'=>'16:20','ket'=>'-'],
-                                ];
-
-                                $statusConfig = [
-                                    'Hadir'       => ['icon'=>'fa-check-circle',   'class'=>'text-green-600 bg-green-50',  'text'=>'text-green-600'],
-                                    'Izin'        => ['icon'=>'fa-clock',          'class'=>'text-orange-500 bg-orange-50','text'=>'text-orange-500'],
-                                    'Tidak Hadir' => ['icon'=>'fa-times-circle',   'class'=>'text-red-500 bg-red-50',      'text'=>'text-red-500'],
-                                    'Belum Absen' => ['icon'=>'fa-question-circle','class'=>'text-gray-400 bg-gray-50',    'text'=>'text-gray-400'],
-                                ];
-
-                                foreach ($presences as $p):
+                                <?php if (empty($presences)): ?>
+                                <tr><td colspan="4" class="px-6 py-8 text-center text-gray-400">Belum ada mahasiswa bimbingan.</td></tr>
+                                <?php else: ?>
+                                <?php foreach ($presences as $p):
                                     $cfg = $statusConfig[$p['status']] ?? $statusConfig['Belum Absen'];
                                 ?>
                                 <tr class="presence-row transition-colors">
                                     <td class="px-6 py-4">
                                         <div class="flex items-center gap-3">
-                                            <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-white font-semibold text-[13px] shrink-0">
-                                                <?= strtoupper(substr($p['nama'], 0, 2)) ?>
-                                            </div>
+                                            <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-white font-semibold text-[13px] shrink-0"><?= strtoupper(substr($p['nama'], 0, 2)) ?></div>
                                             <div>
                                                 <p class="font-semibold text-gray-800"><?= htmlspecialchars($p['nama']) ?></p>
                                                 <p class="text-[12px] text-gray-400"><?= $p['nim'] ?> · <?= htmlspecialchars($p['instansi']) ?></p>
@@ -180,17 +194,14 @@
                                     </td>
                                     <td class="px-6 py-4">
                                         <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold <?= $cfg['class'] ?>">
-                                            <i class="fas <?= $cfg['icon'] ?> text-[11px]"></i>
-                                            <?= $p['status'] ?>
+                                            <i class="fas <?= $cfg['icon'] ?> text-[11px]"></i> <?= $p['status'] ?>
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 text-gray-700 font-medium"><?= $p['masuk'] ?></td>
-                                    <td class="px-6 py-4 text-gray-700 font-medium"><?= $p['keluar'] ?></td>
-                                    <td class="px-6 py-4 text-gray-500 text-[13px]">
-                                        <?= $p['ket'] === '-' ? '<span class="text-gray-300">-</span>' : htmlspecialchars($p['ket']) ?>
-                                    </td>
+                                    <td class="px-6 py-4 text-gray-500 text-[13px]"><span class="text-gray-300">-</span></td>
                                 </tr>
                                 <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -198,7 +209,6 @@
 
             </div>
         </main>
-
         <?php include '../includes/footer.php'; ?>
     </div>
 

@@ -1,7 +1,54 @@
 <?php
-    session_start();
+    require_once __DIR__ . "/../config/role_guard.php";
+    checkRole("mahasiswa");
+    require_once __DIR__ . '/../config/db_connect.php';
     $role = 'mahasiswa';
     $activePage = 'jurnal';
+
+    $userId = $_SESSION['id_user'];
+    $stmt = $conn->prepare("SELECT id FROM mahasiswa WHERE user_id = :uid");
+    $stmt->execute(['uid' => $userId]);
+    $mhs = $stmt->fetch();
+    $mhsId = $mhs ? $mhs['id'] : 0;
+
+    $error = '';
+    // Handle form submission
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $tanggal = $_POST['tanggal'] ?? '';
+        $kegiatan = trim($_POST['judul'] ?? '');
+        $deskripsi = trim($_POST['deskripsi'] ?? '');
+
+        if (!$tanggal || !$kegiatan || !$deskripsi) {
+            $error = 'Semua field wajib harus diisi.';
+        } else {
+            // Handle file upload
+            $dokumentasi = null;
+            if (isset($_FILES['bukti']) && $_FILES['bukti']['error'] === UPLOAD_ERR_OK) {
+                $uploadDir = __DIR__ . '/../uploads/logbooks/';
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+                $ext = pathinfo($_FILES['bukti']['name'], PATHINFO_EXTENSION);
+                $filename = 'logbook_' . $mhsId . '_' . time() . '.' . $ext;
+                if (move_uploaded_file($_FILES['bukti']['tmp_name'], $uploadDir . $filename)) {
+                    $dokumentasi = 'uploads/logbooks/' . $filename;
+                }
+            }
+
+            $stmt = $conn->prepare("
+                INSERT INTO logbooks (mahasiswa_id, tanggal, kegiatan, hasil, dokumentasi, status)
+                VALUES (:mid, :tgl, :keg, :hasil, :dok, 'pending')
+            ");
+            $stmt->execute([
+                'mid' => $mhsId,
+                'tgl' => $tanggal,
+                'keg' => $kegiatan,
+                'hasil' => $deskripsi,
+                'dok' => $dokumentasi,
+            ]);
+            header("Location: jurnal.php?added=1");
+            exit;
+        }
+    }
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -21,18 +68,20 @@
 </head>
 <body class="flex h-screen overflow-hidden text-gray-800">
 
-    <!-- Sidebar -->
     <?php include '../includes/sidebar.php'; ?>
 
-    <!-- Main Wrapper -->
     <div class="flex-1 flex flex-col h-screen overflow-hidden">
 
-        <!-- Header -->
         <?php include '../includes/header.php'; ?>
 
-        <!-- Main Content -->
         <main class="flex-1 overflow-y-auto p-6 md:p-8 bg-[#f8f9fa]">
             <div class="max-w-[1200px] mx-auto space-y-6">
+
+                <?php if ($error): ?>
+                <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-[14px] flex items-center gap-2">
+                    <i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?>
+                </div>
+                <?php endif; ?>
 
                 <!-- Page Banner -->
                 <div class="bg-[#3b66f5] rounded-2xl p-8 flex items-center gap-5 shadow-sm relative overflow-hidden">
@@ -53,7 +102,7 @@
                         <p class="text-[14px] text-gray-400 mt-1">Isi detail kegiatan magang Anda hari ini.</p>
                     </div>
 
-                    <form action="#" method="POST" enctype="multipart/form-data" id="formJurnal">
+                    <form action="" method="POST" enctype="multipart/form-data" id="formJurnal">
 
                         <!-- Tanggal Kegiatan -->
                         <div class="mb-6">
@@ -81,33 +130,19 @@
 
                         <!-- Bukti Kegiatan -->
                         <div class="mb-6">
-                            <label class="block text-[14px] font-semibold text-gray-700 mb-2">
-                                Bukti Kegiatan
-                            </label>
-
-                            <!-- Dropzone -->
+                            <label class="block text-[14px] font-semibold text-gray-700 mb-2">Bukti Kegiatan</label>
                             <div id="dropzone"
                                  class="dropzone border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/60 p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all"
                                  onclick="document.getElementById('buktFile').click()"
-                                 ondragover="onDragOver(event)"
-                                 ondragleave="onDragLeave(event)"
-                                 ondrop="onDrop(event)">
-
+                                 ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
                                 <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
                                     <i class="fas fa-cloud-upload-alt text-gray-400 text-[20px]"></i>
                                 </div>
                                 <p class="text-[14px] text-gray-600 font-medium">Klik atau seret gambar ke sini</p>
                                 <p class="text-[12px] text-gray-400 mt-1 mb-4">(Maks. 2MB)</p>
-                                <button type="button"
-                                        class="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-[13px] font-medium px-5 py-2 rounded-lg transition-colors shadow-sm">
-                                    Pilih File
-                                </button>
-                                <input type="file" id="buktFile" name="bukti" class="hidden"
-                                       accept="image/jpeg,image/png,image/jpg"
-                                       onchange="onFileSelect(event)">
+                                <button type="button" class="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-[13px] font-medium px-5 py-2 rounded-lg transition-colors shadow-sm">Pilih File</button>
+                                <input type="file" id="buktFile" name="bukti" class="hidden" accept="image/jpeg,image/png,image/jpg" onchange="onFileSelect(event)">
                             </div>
-
-                            <!-- Preview -->
                             <div id="filePreview" class="hidden mt-3 p-3 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-between gap-3">
                                 <div class="flex items-center gap-3">
                                     <div class="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 bg-white shrink-0 flex items-center justify-center">
@@ -138,12 +173,8 @@
 
                         <!-- Action Buttons -->
                         <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
-                            <a href="jurnal.php"
-                               class="px-6 py-2.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-medium text-[14px] transition-colors shadow-sm">
-                                Batal
-                            </a>
-                            <button type="submit"
-                                    class="px-6 py-2.5 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-xl font-medium text-[14px] transition-colors shadow-sm flex items-center gap-2">
+                            <a href="jurnal.php" class="px-6 py-2.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-medium text-[14px] transition-colors shadow-sm">Batal</a>
+                            <button type="submit" class="px-6 py-2.5 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-xl font-medium text-[14px] transition-colors shadow-sm flex items-center gap-2">
                                 <i class="fas fa-save text-[13px]"></i> Simpan Jurnal
                             </button>
                         </div>
@@ -158,64 +189,22 @@
     </div>
 
     <script>
-        // ── Drag & Drop ──────────────────────────────────────────
-        function onDragOver(e) {
-            e.preventDefault();
-            document.getElementById('dropzone').classList.add('drag-over', 'border-blue-400', 'bg-blue-50');
-        }
-        function onDragLeave(e) {
-            document.getElementById('dropzone').classList.remove('drag-over', 'border-blue-400', 'bg-blue-50');
-        }
-        function onDrop(e) {
-            e.preventDefault();
-            onDragLeave(e);
-            const file = e.dataTransfer.files[0];
-            if (file) showPreview(file);
-        }
-        function onFileSelect(e) {
-            const file = e.target.files[0];
-            if (file) showPreview(file);
-        }
-
-        // ── Preview File ─────────────────────────────────────────
+        function onDragOver(e) { e.preventDefault(); document.getElementById('dropzone').classList.add('drag-over', 'border-blue-400', 'bg-blue-50'); }
+        function onDragLeave(e) { document.getElementById('dropzone').classList.remove('drag-over', 'border-blue-400', 'bg-blue-50'); }
+        function onDrop(e) { e.preventDefault(); onDragLeave(e); const file = e.dataTransfer.files[0]; if (file) showPreview(file); }
+        function onFileSelect(e) { const file = e.target.files[0]; if (file) showPreview(file); }
         function showPreview(file) {
-            const maxSize = 2 * 1024 * 1024; // 2MB
-            if (file.size > maxSize) {
-                alert('Ukuran file melebihi 2MB. Silakan pilih file yang lebih kecil.');
-                clearFile();
-                return;
-            }
+            if (file.size > 2 * 1024 * 1024) { alert('Ukuran file melebihi 2MB.'); clearFile(); return; }
             document.getElementById('previewName').textContent = file.name;
             document.getElementById('previewSize').textContent = (file.size / 1024).toFixed(1) + ' KB';
             document.getElementById('filePreview').classList.remove('hidden');
-
-            // Show image preview if it's an image
             const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = document.getElementById('previewImg');
-                img.src = e.target.result;
-                img.classList.remove('hidden');
-                document.getElementById('previewIcon').classList.add('hidden');
-            };
+            reader.onload = function(e) { const img = document.getElementById('previewImg'); img.src = e.target.result; img.classList.remove('hidden'); document.getElementById('previewIcon').classList.add('hidden'); };
             reader.readAsDataURL(file);
         }
-
-        function clearFile() {
-            document.getElementById('buktFile').value = '';
-            document.getElementById('filePreview').classList.add('hidden');
-            document.getElementById('previewImg').src = '#';
-            document.getElementById('previewImg').classList.add('hidden');
-            document.getElementById('previewIcon').classList.remove('hidden');
-        }
-
-        // ── Character Counter ─────────────────────────────────────
-        document.getElementById('deskripsi').addEventListener('input', function() {
-            document.getElementById('charCount').textContent = this.value.length;
-        });
-
-        // ── Set tanggal default ke hari ini ──────────────────────
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('tanggal').value = today;
+        function clearFile() { document.getElementById('buktFile').value = ''; document.getElementById('filePreview').classList.add('hidden'); document.getElementById('previewImg').src = '#'; document.getElementById('previewImg').classList.add('hidden'); document.getElementById('previewIcon').classList.remove('hidden'); }
+        document.getElementById('deskripsi').addEventListener('input', function() { document.getElementById('charCount').textContent = this.value.length; });
+        document.getElementById('tanggal').value = new Date().toISOString().split('T')[0];
     </script>
 </body>
 </html>

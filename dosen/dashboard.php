@@ -1,7 +1,110 @@
 <?php
-    session_start();
+    require_once __DIR__ . "/../config/role_guard.php";
+    checkRole("dosen_pembimbing");
+    require_once __DIR__ . '/../config/db_connect.php';
     $role = 'dosen';
     $activePage = 'dashboard';
+
+    // ====== DYNAMIC DATA QUERIES ======
+    $userId = $_SESSION['id_user'];
+    $dosenName = $_SESSION['nama'] ?? 'Dosen';
+
+    // Get dosen_pembimbing record
+    $stmt = $conn->prepare("SELECT id FROM dosen_pembimbing WHERE user_id = :uid");
+    $stmt->execute(['uid' => $userId]);
+    $dosen = $stmt->fetch();
+    $dosenId = $dosen ? $dosen['id'] : 0;
+
+    // Total mahasiswa bimbingan
+    $stmt = $conn->prepare("
+        SELECT COUNT(*) FROM mahasiswa m
+        JOIN `groups` g ON m.group_id = g.id
+        WHERE g.dosen_pembimbing_id = :did
+    ");
+    $stmt->execute(['did' => $dosenId]);
+    $totalMhsBimbingan = (int)$stmt->fetchColumn();
+
+    // Jurnal pending (logbooks from mahasiswa bimbingan with status 'pending')
+    $stmt = $conn->prepare("
+        SELECT COUNT(*) FROM logbooks l
+        JOIN mahasiswa m ON l.mahasiswa_id = m.id
+        JOIN `groups` g ON m.group_id = g.id
+        WHERE g.dosen_pembimbing_id = :did AND l.status = 'pending'
+    ");
+    $stmt->execute(['did' => $dosenId]);
+    $jurnalPending = (int)$stmt->fetchColumn();
+
+    // Laporan masuk
+    $stmt = $conn->prepare("
+        SELECT COUNT(*) FROM final_reports fr
+        JOIN mahasiswa m ON fr.mahasiswa_id = m.id
+        JOIN `groups` g ON m.group_id = g.id
+        WHERE g.dosen_pembimbing_id = :did
+    ");
+    $stmt->execute(['did' => $dosenId]);
+    $laporanMasuk = (int)$stmt->fetchColumn();
+
+    // Penilaian stats
+    $stmt = $conn->prepare("
+        SELECT m.id FROM mahasiswa m
+        JOIN `groups` g ON m.group_id = g.id
+        WHERE g.dosen_pembimbing_id = :did
+    ");
+    $stmt->execute(['did' => $dosenId]);
+    $mhsIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    $sudahDinilai = 0;
+    $belumDinilai = 0;
+    foreach ($mhsIds as $mid) {
+        $chk = $conn->prepare("SELECT COUNT(*) FROM nilai_kriteria WHERE mahasiswa_id = :mid AND penilai_user_id = :uid");
+        $chk->execute(['mid' => $mid, 'uid' => $userId]);
+        if ((int)$chk->fetchColumn() > 0) {
+            $sudahDinilai++;
+        } else {
+            $belumDinilai++;
+        }
+    }
+    $totalPenilaianPct = $totalMhsBimbingan > 0 ? round($sudahDinilai / $totalMhsBimbingan * 100) : 0;
+    $prosesPct = 0; // Simplified: either done or not
+    $belumPct = $totalMhsBimbingan > 0 ? round($belumDinilai / $totalMhsBimbingan * 100) : 0;
+
+    // Monthly logbook activity from mahasiswa bimbingan (current year)
+    $currentYear = date('Y');
+    $stmt = $conn->prepare("
+        SELECT MONTH(l.tanggal) as bulan,
+               COUNT(*) as total_masuk,
+               SUM(CASE WHEN l.status != 'pending' THEN 1 ELSE 0 END) as total_reviewed
+        FROM logbooks l
+        JOIN mahasiswa m ON l.mahasiswa_id = m.id
+        JOIN `groups` g ON m.group_id = g.id
+        WHERE g.dosen_pembimbing_id = :did AND YEAR(l.tanggal) = :yr
+        GROUP BY MONTH(l.tanggal) ORDER BY bulan
+    ");
+    $stmt->execute(['did' => $dosenId, 'yr' => $currentYear]);
+    $monthlyLogbook = $stmt->fetchAll();
+
+    $jurnalMasukData = array_fill(0, 12, 0);
+    $jurnalReviewData = array_fill(0, 12, 0);
+    foreach ($monthlyLogbook as $r) {
+        $jurnalMasukData[(int)$r['bulan'] - 1] = (int)$r['total_masuk'];
+        $jurnalReviewData[(int)$r['bulan'] - 1] = (int)$r['total_reviewed'];
+    }
+
+    // Mahasiswa bimbingan list with stats
+    $stmt = $conn->prepare("
+        SELECT m.id, m.nama, m.no_ktm, c.nama_perusahaan,
+               (SELECT COUNT(*) FROM logbooks lb WHERE lb.mahasiswa_id = m.id) as total_jurnal,
+               (SELECT COUNT(*) FROM attendances a WHERE a.mahasiswa_id = m.id AND a.status = 'Hadir') as total_hadir,
+               (SELECT COUNT(*) FROM attendances a WHERE a.mahasiswa_id = m.id) as total_absen,
+               (SELECT COUNT(*) FROM nilai_kriteria nk WHERE nk.mahasiswa_id = m.id AND nk.penilai_user_id = :uid) as sudah_dinilai
+        FROM mahasiswa m
+        JOIN `groups` g ON m.group_id = g.id
+        LEFT JOIN companies c ON g.company_id = c.id
+        WHERE g.dosen_pembimbing_id = :did
+        ORDER BY m.nama ASC
+    ");
+    $stmt->execute(['did' => $dosenId, 'uid' => $userId]);
+    $students = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -49,7 +152,7 @@
                 <div class="bg-gradient-to-r from-[#1e40af] to-[#3b66f5] rounded-2xl p-8 flex items-center justify-between shadow-sm relative overflow-hidden">
                     <div class="text-white z-10">
                         <p class="text-blue-200 text-[13px] font-medium mb-1 uppercase tracking-wider">Dosen Pembimbing</p>
-                        <h2 class="text-2xl font-bold mb-2 tracking-tight">Selamat Datang, <?= htmlspecialchars($_SESSION['nama'] ?? 'Dosen') ?>!</h2>
+                        <h2 class="text-2xl font-bold mb-2 tracking-tight">Selamat Datang, <?= htmlspecialchars($dosenName) ?>!</h2>
                         <p class="text-blue-100 text-[15px]">Pantau perkembangan mahasiswa bimbingan Anda dengan mudah.</p>
                     </div>
                     <!-- Illustration shapes -->
@@ -78,7 +181,7 @@
                             <span class="text-[11px] font-semibold text-green-500 bg-green-50 px-2 py-1 rounded-full">Aktif</span>
                         </div>
                         <p class="text-[13px] text-gray-500 mb-1">Mhs Bimbingan</p>
-                        <p class="text-3xl font-bold text-gray-900">12</p>
+                        <p class="text-3xl font-bold text-gray-900"><?= $totalMhsBimbingan ?></p>
                         <p class="text-[12px] text-gray-400 mt-1">Mahasiswa aktif magang</p>
                     </div>
 
@@ -91,7 +194,7 @@
                             <span class="text-[11px] font-semibold text-orange-500 bg-orange-50 px-2 py-1 rounded-full">Pending</span>
                         </div>
                         <p class="text-[13px] text-gray-500 mb-1">Jurnal Pending</p>
-                        <p class="text-3xl font-bold text-gray-900">7</p>
+                        <p class="text-3xl font-bold text-gray-900"><?= $jurnalPending ?></p>
                         <p class="text-[12px] text-gray-400 mt-1">Menunggu review Anda</p>
                     </div>
 
@@ -101,10 +204,10 @@
                             <div class="w-11 h-11 rounded-xl bg-purple-50 flex items-center justify-center">
                                 <i class="fas fa-file-alt text-purple-500 text-[18px]"></i>
                             </div>
-                            <span class="text-[11px] font-semibold text-purple-500 bg-purple-50 px-2 py-1 rounded-full">Baru</span>
+                            <span class="text-[11px] font-semibold text-purple-500 bg-purple-50 px-2 py-1 rounded-full"><?= $laporanMasuk > 0 ? 'Baru' : '-' ?></span>
                         </div>
                         <p class="text-[13px] text-gray-500 mb-1">Laporan Masuk</p>
-                        <p class="text-3xl font-bold text-gray-900">4</p>
+                        <p class="text-3xl font-bold text-gray-900"><?= $laporanMasuk ?></p>
                         <p class="text-[12px] text-gray-400 mt-1">Laporan akhir diterima</p>
                     </div>
 
@@ -117,8 +220,8 @@
                             <span class="text-[11px] font-semibold text-green-500 bg-green-50 px-2 py-1 rounded-full">Selesai</span>
                         </div>
                         <p class="text-[13px] text-gray-500 mb-1">Penilaian Selesai</p>
-                        <p class="text-3xl font-bold text-gray-900">8</p>
-                        <p class="text-[12px] text-gray-400 mt-1">Dari 12 mahasiswa</p>
+                        <p class="text-3xl font-bold text-gray-900"><?= $sudahDinilai ?></p>
+                        <p class="text-[12px] text-gray-400 mt-1">Dari <?= $totalMhsBimbingan ?> mahasiswa</p>
                     </div>
 
                 </div>
@@ -133,15 +236,7 @@
                                 <h3 class="text-[17px] font-bold text-gray-800">Aktivitas Jurnal Mahasiswa</h3>
                                 <p class="text-[13px] text-gray-400 mt-0.5">Jumlah jurnal disubmit per bulan</p>
                             </div>
-                            <div class="relative">
-                                <select id="yearSelect" class="appearance-none bg-white border border-gray-200 text-gray-700 py-1.5 pl-4 pr-10 rounded-lg text-[14px] font-medium outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 cursor-pointer shadow-sm transition-all">
-                                    <option>2024</option>
-                                    <option>2023</option>
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
-                                    <i class="fas fa-chevron-down text-[10px]"></i>
-                                </div>
-                            </div>
+                            <span class="text-[12px] text-gray-400 bg-gray-100 px-3 py-1 rounded-full"><?= $currentYear ?></span>
                         </div>
                         <div class="relative w-full h-[260px]">
                             <canvas id="barChart"></canvas>
@@ -164,19 +259,13 @@
                                 <span class="flex items-center gap-2.5 text-gray-600">
                                     <span class="w-2.5 h-2.5 rounded-full bg-[#10b981]"></span> Sudah Dinilai
                                 </span>
-                                <span class="font-bold text-gray-800">67%</span>
-                            </div>
-                            <div class="flex items-center justify-between text-[14px]">
-                                <span class="flex items-center gap-2.5 text-gray-600">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-[#fbbf24]"></span> Dalam Proses
-                                </span>
-                                <span class="font-bold text-gray-800">16%</span>
+                                <span class="font-bold text-gray-800"><?= $totalPenilaianPct ?>%</span>
                             </div>
                             <div class="flex items-center justify-between text-[14px]">
                                 <span class="flex items-center gap-2.5 text-gray-600">
                                     <span class="w-2.5 h-2.5 rounded-full bg-[#ef4444]"></span> Belum Dinilai
                                 </span>
-                                <span class="font-bold text-gray-800">17%</span>
+                                <span class="font-bold text-gray-800"><?= $belumPct ?>%</span>
                             </div>
                         </div>
                     </div>
@@ -190,7 +279,7 @@
                             <h3 class="text-[17px] font-bold text-gray-800">Daftar Mahasiswa Bimbingan</h3>
                             <p class="text-[13px] text-gray-400 mt-0.5">Monitoring progres magang mahasiswa</p>
                         </div>
-                        <a href="#" class="text-[13px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg transition-colors">
+                        <a href="mhs_bimbingan.php" class="text-[13px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg transition-colors">
                             Lihat Semua
                         </a>
                     </div>
@@ -209,25 +298,19 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
-
-                                <?php
-                                $students = [
-                                    ['no'=>1,'nama'=>'Ahmad Fauzi','nim'=>'20210001','instansi'=>'PT. Telkom Indonesia','jurnal'=>28,'hadir'=>92,'status'=>'Dinilai'],
-                                    ['no'=>2,'nama'=>'Budi Santoso','nim'=>'20210002','instansi'=>'CV. Karya Digital','jurnal'=>24,'hadir'=>87,'status'=>'Proses'],
-                                    ['no'=>3,'nama'=>'Citra Dewi','nim'=>'20210003','instansi'=>'PT. Bank BRI','jurnal'=>30,'hadir'=>95,'status'=>'Dinilai'],
-                                    ['no'=>4,'nama'=>'Deni Setiawan','nim'=>'20210004','instansi'=>'Dinas Kominfo Kota','jurnal'=>15,'hadir'=>76,'status'=>'Belum'],
-                                    ['no'=>5,'nama'=>'Eka Rahmawati','nim'=>'20210005','instansi'=>'PT. Indosat Ooredoo','jurnal'=>22,'hadir'=>89,'status'=>'Proses'],
-                                ];
-                                foreach ($students as $s):
-                                    $statusClass = match($s['status']) {
-                                        'Dinilai' => 'bg-green-100 text-green-700',
-                                        'Proses'  => 'bg-yellow-100 text-yellow-700',
-                                        default   => 'bg-red-100 text-red-600',
-                                    };
-                                    $hadirColor = $s['hadir'] >= 90 ? 'text-green-600' : ($s['hadir'] >= 80 ? 'text-yellow-600' : 'text-red-500');
+                                <?php if (empty($students)): ?>
+                                <tr>
+                                    <td colspan="7" class="px-6 py-8 text-center text-gray-400">Belum ada mahasiswa bimbingan.</td>
+                                </tr>
+                                <?php else: ?>
+                                <?php foreach ($students as $i => $s):
+                                    $hadirPct = $s['total_absen'] > 0 ? round($s['total_hadir'] / $s['total_absen'] * 100) : 0;
+                                    $statusLabel = $s['sudah_dinilai'] > 0 ? 'Dinilai' : 'Belum';
+                                    $statusClass = $statusLabel === 'Dinilai' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600';
+                                    $hadirColor = $hadirPct >= 90 ? 'text-green-600' : ($hadirPct >= 80 ? 'text-yellow-600' : 'text-red-500');
                                 ?>
                                 <tr class="student-row transition-colors">
-                                    <td class="px-6 py-4 text-gray-400"><?= $s['no'] ?></td>
+                                    <td class="px-6 py-4 text-gray-400"><?= $i + 1 ?></td>
                                     <td class="px-6 py-4">
                                         <div class="flex items-center gap-3">
                                             <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-[12px] shrink-0">
@@ -235,29 +318,29 @@
                                             </div>
                                             <div>
                                                 <p class="font-semibold text-gray-800"><?= htmlspecialchars($s['nama']) ?></p>
-                                                <p class="text-[12px] text-gray-400"><?= $s['nim'] ?></p>
+                                                <p class="text-[12px] text-gray-400"><?= htmlspecialchars($s['no_ktm'] ?? '-') ?></p>
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 text-gray-600"><?= htmlspecialchars($s['instansi']) ?></td>
+                                    <td class="px-6 py-4 text-gray-600"><?= htmlspecialchars($s['nama_perusahaan'] ?? '-') ?></td>
                                     <td class="px-6 py-4">
-                                        <span class="font-semibold text-gray-800"><?= $s['jurnal'] ?></span>
+                                        <span class="font-semibold text-gray-800"><?= $s['total_jurnal'] ?></span>
                                         <span class="text-gray-400"> jurnal</span>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <span class="font-semibold <?= $hadirColor ?>"><?= $s['hadir'] ?>%</span>
+                                        <span class="font-semibold <?= $hadirColor ?>"><?= $hadirPct ?>%</span>
                                     </td>
                                     <td class="px-6 py-4">
                                         <span class="px-3 py-1 rounded-full text-[12px] font-semibold <?= $statusClass ?>">
-                                            <?= $s['status'] ?>
+                                            <?= $statusLabel ?>
                                         </span>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <a href="#" class="text-blue-600 hover:text-blue-800 text-[13px] font-medium hover:underline">Detail</a>
+                                        <a href="mhs_bimbingan.php?detail=<?= $s['id'] ?>" class="text-blue-600 hover:text-blue-800 text-[13px] font-medium hover:underline">Detail</a>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
-
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -271,130 +354,54 @@
 
     <!-- Chart Scripts -->
     <script>
+        const jurnalMasukData = <?= json_encode(array_values($jurnalMasukData)) ?>;
+        const jurnalReviewData = <?= json_encode(array_values($jurnalReviewData)) ?>;
+        const penilaianData = { dinilai: <?= $sudahDinilai ?>, belum: <?= $belumDinilai ?> };
+
         document.addEventListener('DOMContentLoaded', function () {
+            const maxJurnal = Math.max(...jurnalMasukData, 5) + 10;
 
             // Bar Chart: Aktivitas Jurnal per Bulan
-            const barCtx = document.getElementById('barChart').getContext('2d');
-            new Chart(barCtx, {
+            new Chart(document.getElementById('barChart').getContext('2d'), {
                 type: 'bar',
                 data: {
                     labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
                     datasets: [
-                        {
-                            label: 'Jurnal Masuk',
-                            data: [45, 52, 60, 58, 72, 68, 80, 85, 78, 88, 92, 95],
-                            backgroundColor: '#3b66f5',
-                            hoverBackgroundColor: '#2350d4',
-                            borderRadius: 4,
-                            barPercentage: 0.6,
-                            categoryPercentage: 0.75
-                        },
-                        {
-                            label: 'Sudah Direview',
-                            data: [38, 44, 55, 50, 65, 60, 74, 79, 70, 80, 85, 88],
-                            backgroundColor: '#10b981',
-                            hoverBackgroundColor: '#059669',
-                            borderRadius: 4,
-                            barPercentage: 0.6,
-                            categoryPercentage: 0.75
-                        }
+                        { label: 'Jurnal Masuk', data: jurnalMasukData, backgroundColor: '#3b66f5', hoverBackgroundColor: '#2350d4', borderRadius: 4, barPercentage: 0.6, categoryPercentage: 0.75 },
+                        { label: 'Sudah Direview', data: jurnalReviewData, backgroundColor: '#10b981', hoverBackgroundColor: '#059669', borderRadius: 4, barPercentage: 0.6, categoryPercentage: 0.75 }
                     ]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    responsive: true, maintainAspectRatio: false,
                     plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top',
-                            align: 'end',
-                            labels: {
-                                boxWidth: 10,
-                                boxHeight: 10,
-                                borderRadius: 5,
-                                useBorderRadius: true,
-                                font: { family: "'Inter', sans-serif", size: 12 },
-                                color: '#6b7280',
-                                padding: 16
-                            }
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(17,24,39,0.9)',
-                            padding: 12,
-                            titleFont: { family: "'Inter', sans-serif", size: 13, weight: '600' },
-                            bodyFont: { family: "'Inter', sans-serif", size: 13 },
-                            cornerRadius: 8,
-                        }
+                        legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 10, boxHeight: 10, borderRadius: 5, useBorderRadius: true, font: { family: "'Inter'", size: 12 }, color: '#6b7280', padding: 16 } },
+                        tooltip: { backgroundColor: 'rgba(17,24,39,0.9)', padding: 12, cornerRadius: 8 }
                     },
                     scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 110,
-                            ticks: {
-                                stepSize: 20,
-                                color: '#9ca3af',
-                                font: { family: "'Inter', sans-serif", size: 11 },
-                                padding: 10
-                            },
-                            grid: {
-                                color: '#e5e7eb',
-                                drawBorder: false,
-                                borderDash: [5, 5]
-                            },
-                            border: { display: false }
-                        },
-                        x: {
-                            ticks: {
-                                color: '#9ca3af',
-                                font: { family: "'Inter', sans-serif", size: 11 },
-                                padding: 8
-                            },
-                            grid: { display: false, drawBorder: false },
-                            border: { display: false }
-                        }
+                        y: { beginAtZero: true, max: maxJurnal, ticks: { stepSize: Math.ceil(maxJurnal / 5), color: '#9ca3af', font: { size: 11 }, padding: 10 }, grid: { color: '#e5e7eb', borderDash: [5,5] }, border: { display: false } },
+                        x: { ticks: { color: '#9ca3af', font: { size: 11 }, padding: 8 }, grid: { display: false }, border: { display: false } }
                     },
                     interaction: { mode: 'index', intersect: false }
                 }
             });
 
             // Donut Chart: Status Penilaian
-            const donutCtx = document.getElementById('donutChart').getContext('2d');
-            new Chart(donutCtx, {
+            new Chart(document.getElementById('donutChart').getContext('2d'), {
                 type: 'doughnut',
                 data: {
-                    labels: ['Sudah Dinilai', 'Dalam Proses', 'Belum Dinilai'],
-                    datasets: [{
-                        data: [8, 2, 2],
-                        backgroundColor: ['#10b981', '#fbbf24', '#ef4444'],
-                        borderWidth: 0,
-                        hoverOffset: 6
-                    }]
+                    labels: ['Sudah Dinilai', 'Belum Dinilai'],
+                    datasets: [{ data: [penilaianData.dinilai, penilaianData.belum], backgroundColor: ['#10b981', '#ef4444'], borderWidth: 0, hoverOffset: 6 }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '72%',
-                    layout: { padding: 10 },
+                    responsive: true, maintainAspectRatio: false, cutout: '72%', layout: { padding: 10 },
                     plugins: {
                         legend: { display: false },
-                        tooltip: {
-                            backgroundColor: 'rgba(17,24,39,0.9)',
-                            padding: 12,
-                            titleFont: { family: "'Inter', sans-serif", size: 13, weight: '600' },
-                            bodyFont: { family: "'Inter', sans-serif", size: 13 },
-                            cornerRadius: 8,
-                            callbacks: {
-                                label: function (ctx) {
-                                    const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-                                    const pct = Math.round(ctx.parsed / total * 100);
-                                    return ` ${ctx.label}: ${ctx.parsed} mhs (${pct}%)`;
-                                }
-                            }
+                        tooltip: { backgroundColor: 'rgba(17,24,39,0.9)', padding: 12, cornerRadius: 8,
+                            callbacks: { label: ctx => { const total = ctx.dataset.data.reduce((a,b) => a+b, 0); const pct = total > 0 ? Math.round(ctx.parsed / total * 100) : 0; return ` ${ctx.label}: ${ctx.parsed} mhs (${pct}%)`; } }
                         }
                     }
                 }
             });
-
         });
     </script>
 </body>
