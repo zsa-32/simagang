@@ -32,7 +32,6 @@ $userAvatar = $userAvatar ?? 'https://ui-avatars.com/api/?name=' . urlencode($us
              class="hidden absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
             <div class="px-4 py-3 border-b border-gray-100">
                 <p class="text-[13px] font-semibold text-gray-800"><?= htmlspecialchars($userName) ?></p>
-                <p class="text-[12px] text-gray-400 mt-0.5">Mahasiswa Magang</p>
             </div>
             <a href="profil.php" class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition-colors">
                 <i class="fas fa-user w-4 text-center text-gray-400"></i> Profil Saya

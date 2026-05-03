@@ -20,7 +20,7 @@ if (session_status() === PHP_SESSION_NONE) {
  *
  * @param string|array $allowedRoles Single role name or array of allowed role names
  */
-function checkRole(string|array $allowedRoles): void
+function checkRole($allowedRoles)
 {
     // Check if user is logged in
     if (!isset($_SESSION['id_user']) || !isset($_SESSION['role_name'])) {

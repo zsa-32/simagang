@@ -32,6 +32,12 @@ $menus = [
         ['title' => 'Monitoring Mahasiswa',  'icon' => 'fa-user-graduate', 'url' => 'monitoring_mahasiswa.php',   'id' => 'monitoring_mahasiswa',  'group' => 'MENU UTAMA'],
         ['title' => 'Pengaturan Sistem',     'icon' => 'fa-cog',           'url' => 'pengaturan.php',             'id' => 'pengaturan',            'group' => 'PENGATURAN'],
     ],
+    'koordinator' => [
+        ['title' => 'Dashboard',             'icon' => 'fa-th-large',      'url' => 'dashboard.php',     'id' => 'dashboard'],
+        ['title' => 'Monitoring Program',    'icon' => 'fa-eye',           'url' => 'monitoring.php',    'id' => 'monitoring'],
+        ['title' => 'Statistik',             'icon' => 'fa-chart-bar',     'url' => 'statistik.php',     'id' => 'statistik'],
+        ['title' => 'Laporan',               'icon' => 'fa-file-alt',      'url' => 'laporan.php',       'id' => 'laporan'],
+    ],
 ];
 
 $currentMenu = $menus[$role] ?? [];

@@ -64,6 +64,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     header("Location: pembimbing/dashboard.php");
                 } elseif ($role === 'mahasiswa') {
                     header("Location: mahasiswa/dashboard.php");
+                } elseif ($role === 'koordinator') {
+                    header("Location: koordinator/dashboard.php");
                 }
                 exit();
 
