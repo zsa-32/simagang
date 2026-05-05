@@ -3,12 +3,12 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Konfigurasi Database
+// Konfigurasi Database (Laragon)
 $host = "localhost";
-$port = "8889";       // MAMP default MySQL port
+$port = "3306";
 $db   = "simagang";
 $user = "root";
-$pass = "root";
+$pass = "";
 
 try {
     // Membuat koneksi dengan PDO
@@ -23,5 +23,5 @@ try {
 }
 
 // Base URL untuk frontend
-define('BASE_URL', 'http://localhost:8888/simagang/simagang/');
+define('BASE_URL', 'http://localhost/simagang/');
 ?>

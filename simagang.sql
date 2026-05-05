@@ -1,3 +1,8 @@
+-- =====================================================
+-- SIMAGANG DATABASE SCHEMA (CLEANED)
+-- Versi bersih tanpa tabel redundant
+-- =====================================================
+
 -- 1. Tabel roles
 CREATE TABLE roles (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -83,7 +88,7 @@ CREATE TABLE dosen_pembimbing (
 );
 
 -- 6. Tabel groups
-CREATE TABLE groups (
+CREATE TABLE `groups` (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     company_id INT,
@@ -116,7 +121,7 @@ CREATE TABLE mahasiswa (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE SET NULL
+    FOREIGN KEY (group_id) REFERENCES `groups`(id) ON DELETE SET NULL
 );
 
 -- 5. Tabel kontak_darurat
@@ -161,19 +166,7 @@ CREATE TABLE attendances (
     FOREIGN KEY (mahasiswa_id) REFERENCES mahasiswa(id) ON DELETE CASCADE
 );
 
--- 12. Tabel attendance_logs
-CREATE TABLE attendance_logs (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    mahasiswa_id INT,
-    action VARCHAR(50),
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    latitude DECIMAL(10, 8),
-    longitude DECIMAL(11, 8),
-    device_info TEXT,
-    FOREIGN KEY (mahasiswa_id) REFERENCES mahasiswa(id) ON DELETE CASCADE
-);
-
--- 13. Tabel logbooks
+-- 12. Tabel logbooks
 CREATE TABLE logbooks (
     id INT AUTO_INCREMENT PRIMARY KEY,
     mahasiswa_id INT,
@@ -189,7 +182,7 @@ CREATE TABLE logbooks (
     FOREIGN KEY (mahasiswa_id) REFERENCES mahasiswa(id) ON DELETE CASCADE
 );
 
--- 14. Tabel feedback_logbooks
+-- 13. Tabel feedback_logbooks
 CREATE TABLE feedback_logbooks (
     id INT AUTO_INCREMENT PRIMARY KEY,
     logbook_id INT,
@@ -200,17 +193,7 @@ CREATE TABLE feedback_logbooks (
     FOREIGN KEY (penilai_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- 15. Tabel log_logbooks
-CREATE TABLE log_logbooks (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    logbook_id INT,
-    action VARCHAR(50),
-    keterangan TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (logbook_id) REFERENCES logbooks(id) ON DELETE CASCADE
-);
-
--- 16. Tabel projects
+-- 14. Tabel projects
 CREATE TABLE projects (
     id INT AUTO_INCREMENT PRIMARY KEY,
     mahasiswa_id INT,
@@ -224,7 +207,7 @@ CREATE TABLE projects (
     FOREIGN KEY (dosen_pembimbing_id) REFERENCES dosen_pembimbing(id) ON DELETE SET NULL
 );
 
--- 17. Tabel project_feedbacks
+-- 15. Tabel project_feedbacks
 CREATE TABLE project_feedbacks (
     id INT AUTO_INCREMENT PRIMARY KEY,
     project_id INT,
@@ -235,22 +218,21 @@ CREATE TABLE project_feedbacks (
     FOREIGN KEY (penilai_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- 18. Tabel final_reports
+-- 16. Tabel final_reports
+-- Catatan: mahasiswa_id dihapus karena bisa dicapai via project_id → projects.mahasiswa_id
 CREATE TABLE final_reports (
     id INT AUTO_INCREMENT PRIMARY KEY,
     project_id INT,
-    mahasiswa_id INT,
     judul_laporan VARCHAR(255) NOT NULL,
     ringkasan TEXT,
     file_path VARCHAR(255),
     status VARCHAR(20),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-    FOREIGN KEY (mahasiswa_id) REFERENCES mahasiswa(id) ON DELETE CASCADE
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
--- 19. Tabel final_report_feedbacks
+-- 17. Tabel final_report_feedbacks
 CREATE TABLE final_report_feedbacks (
     id INT AUTO_INCREMENT PRIMARY KEY,
     final_report_id INT,
@@ -261,18 +243,7 @@ CREATE TABLE final_report_feedbacks (
     FOREIGN KEY (penilai_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- 20. Tabel log_final_reports
-CREATE TABLE log_final_reports (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    final_report_id INT,
-    file_path VARCHAR(255),
-    status VARCHAR(20),
-    keterangan TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (final_report_id) REFERENCES final_reports(id) ON DELETE CASCADE
-);
-
--- 21. Tabel komponen_penilaian
+-- 18. Tabel komponen_penilaian
 CREATE TABLE komponen_penilaian (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nama VARCHAR(100) NOT NULL,
@@ -281,7 +252,7 @@ CREATE TABLE komponen_penilaian (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 22. Tabel kriteria_penilaian
+-- 19. Tabel kriteria_penilaian
 CREATE TABLE kriteria_penilaian (
     id INT AUTO_INCREMENT PRIMARY KEY,
     komponen_id INT,
@@ -293,7 +264,7 @@ CREATE TABLE kriteria_penilaian (
     FOREIGN KEY (komponen_id) REFERENCES komponen_penilaian(id) ON DELETE CASCADE
 );
 
--- 23. Tabel nilai_kriteria
+-- 20. Tabel nilai_kriteria
 CREATE TABLE nilai_kriteria (
     id INT AUTO_INCREMENT PRIMARY KEY,
     mahasiswa_id INT,
@@ -309,7 +280,7 @@ CREATE TABLE nilai_kriteria (
     FOREIGN KEY (penilai_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- 24. Tabel penilaian_results
+-- 21. Tabel penilaian_results (dihitung otomatis dari nilai_kriteria)
 CREATE TABLE penilaian_results (
     id INT AUTO_INCREMENT PRIMARY KEY,
     mahasiswa_id INT,
@@ -321,7 +292,7 @@ CREATE TABLE penilaian_results (
     FOREIGN KEY (mahasiswa_id) REFERENCES mahasiswa(id) ON DELETE CASCADE
 );
 
--- 25. Tabel notifications
+-- 22. Tabel notifications
 CREATE TABLE notifications (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
@@ -332,7 +303,7 @@ CREATE TABLE notifications (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 26. Tabel settings
+-- 23. Tabel settings
 CREATE TABLE settings (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nama_kampus VARCHAR(255),
