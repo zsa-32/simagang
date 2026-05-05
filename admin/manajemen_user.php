@@ -30,6 +30,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } elseif ($roleInput === 'pembimbing') {
             $conn->prepare("INSERT INTO pembimbing_lapang (user_id, nama, jabatan, email) VALUES (:uid, :nama, :jbt, :email)")
                 ->execute(['uid' => $newUserId, 'nama' => $name, 'jbt' => $nomorInduk, 'email' => $email]);
+        } elseif ($roleInput === 'koordinator') {
+            $conn->prepare("INSERT INTO koordinator (user_id, nama, nip, email) VALUES (:uid, :nama, :nip, :email)")
+                ->execute(['uid' => $newUserId, 'nama' => $name, 'nip' => $nomorInduk, 'email' => $email]);
         }
         header("Location: manajemen_user.php?created=1"); exit;
     }
