@@ -124,9 +124,6 @@ $mahasiswaList = $stmt->fetchAll();
                                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[13px]"></i>
                                 <input type="text" id="searchInput" placeholder="Cari mahasiswa..." class="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-full md:w-64 transition-shadow">
                             </div>
-                            <button class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-[13px] font-medium hover:bg-gray-50 flex items-center gap-2 transition-colors">
-                                <i class="fas fa-file-export"></i> Export
-                            </button>
                         </div>
                     </div>
                     

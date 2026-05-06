@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $roleInput = $_POST['role'];
         $nomorInduk = trim($_POST['nomor_induk']);
 
-        $roleMap = ['mahasiswa' => 2, 'dosen' => 3, 'pembimbing' => 4];
+        $roleMap = ['mahasiswa' => 2, 'dosen' => 3, 'pembimbing' => 4, 'koordinator' => 5];
         $roleId = $roleMap[$roleInput] ?? 2;
 
         $stmt = $conn->prepare("INSERT INTO users (role_id, name, email, password) VALUES (:rid, :name, :email, :pw)");
@@ -84,9 +84,9 @@ $stmt->bindValue(':off', $offset, PDO::PARAM_INT);
 $stmt->execute();
 $users = $stmt->fetchAll();
 
-$roleLabels = ['mahasiswa' => 'Mahasiswa', 'dosen_pembimbing' => 'Dosen Pembimbing', 'pembimbing_lapang' => 'Pembimbing Lapang'];
-$roleBadges = ['mahasiswa' => 'bg-blue-100 text-blue-700', 'dosen_pembimbing' => 'bg-purple-100 text-purple-700', 'pembimbing_lapang' => 'bg-teal-100 text-teal-700'];
-$roleColors = ['mahasiswa' => 'bg-blue-600', 'dosen_pembimbing' => 'bg-purple-600', 'pembimbing_lapang' => 'bg-teal-600'];
+$roleLabels = ['mahasiswa' => 'Mahasiswa', 'dosen_pembimbing' => 'Dosen Pembimbing', 'pembimbing_lapang' => 'Pembimbing Lapang', 'koordinator' => 'Koordinator'];
+$roleBadges = ['mahasiswa' => 'bg-blue-100 text-blue-700', 'dosen_pembimbing' => 'bg-purple-100 text-purple-700', 'pembimbing_lapang' => 'bg-teal-100 text-teal-700', 'koordinator' => 'bg-orange-100 text-orange-700'];
+$roleColors = ['mahasiswa' => 'bg-blue-600', 'dosen_pembimbing' => 'bg-purple-600', 'pembimbing_lapang' => 'bg-teal-600', 'koordinator' => 'bg-orange-500'];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -118,11 +118,12 @@ $roleColors = ['mahasiswa' => 'bg-blue-600', 'dosen_pembimbing' => 'bg-purple-60
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-5 border-b border-gray-100">
                         <div class="relative flex-1 w-full"><i class="fas fa-search text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px]"></i><input id="searchInput" type="text" placeholder="Cari nama atau email..." oninput="filterTable()" class="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-[13px] text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"></div>
-                        <div class="flex items-center gap-2 shrink-0">
+                        <div class="flex items-center gap-2 shrink-0 flex-wrap">
                             <button id="filterAll" onclick="setFilter('semua')" class="filter-btn px-4 py-2.5 rounded-xl text-[13px] font-semibold bg-blue-600 text-white transition-all">Semua</button>
                             <button id="filterMhs" onclick="setFilter('mahasiswa')" class="filter-btn px-4 py-2.5 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-100 transition-all">Mahasiswa</button>
                             <button id="filterDosen" onclick="setFilter('dosen_pembimbing')" class="filter-btn px-4 py-2.5 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-100 transition-all">Dosen</button>
                             <button id="filterPL" onclick="setFilter('pembimbing_lapang')" class="filter-btn px-4 py-2.5 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-100 transition-all">Pemb. Lapang</button>
+                            <button id="filterKoord" onclick="setFilter('koordinator')" class="filter-btn px-4 py-2.5 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-100 transition-all">Koordinator</button>
                         </div>
                     </div>
                     <div class="overflow-x-auto">
@@ -185,8 +186,8 @@ $roleColors = ['mahasiswa' => 'bg-blue-600', 'dosen_pembimbing' => 'bg-purple-60
                 <div><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Nama Lengkap</label><input type="text" name="nama" required class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"></div>
                 <div><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Email</label><input type="email" name="email" required class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"></div>
                 <div class="grid grid-cols-2 gap-4">
-                    <div><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Role</label><select name="role" required class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white"><option value="">Pilih role...</option><option value="mahasiswa">Mahasiswa</option><option value="dosen">Dosen Pembimbing</option><option value="pembimbing">Pembimbing Lapang</option></select></div>
-                    <div><label class="block text-[13px] font-medium text-gray-700 mb-1.5">NIM/NIP</label><input type="text" name="nomor_induk" required class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"></div>
+                    <div><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Role</label><select name="role" id="selectRole" required onchange="updateNidLabel()" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white"><option value="">Pilih role...</option><option value="mahasiswa">Mahasiswa</option><option value="dosen">Dosen Pembimbing</option><option value="pembimbing">Pembimbing Lapang</option><option value="koordinator">Koordinator</option></select></div>
+                    <div><label id="nidLabel" class="block text-[13px] font-medium text-gray-700 mb-1.5">NIM/NIP</label><input type="text" name="nomor_induk" required class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"></div>
                 </div>
                 <div><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Password</label><input type="password" name="password" required minlength="8" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"></div>
                 <div class="flex items-center gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 py-2.5 border border-gray-200 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-50">Batal</button><button type="submit" class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-700">Simpan</button></div>
@@ -213,6 +214,13 @@ $roleColors = ['mahasiswa' => 'bg-blue-600', 'dosen_pembimbing' => 'bg-purple-60
         let currentFilter = 'semua';
         function openModal() { document.getElementById('modalBuatAkun').classList.remove('hidden'); document.getElementById('modalBuatAkun').classList.add('flex'); }
         function closeModal() { document.getElementById('modalBuatAkun').classList.add('hidden'); document.getElementById('modalBuatAkun').classList.remove('flex'); }
+        function updateNidLabel() {
+            const role = document.getElementById('selectRole').value;
+            const lbl = document.getElementById('nidLabel');
+            if (role === 'mahasiswa') lbl.textContent = 'NIM (Nomor Induk Mahasiswa)';
+            else if (role === 'pembimbing') lbl.textContent = 'Jabatan';
+            else lbl.textContent = 'NIP';
+        }
         function setFilter(f) {
             currentFilter = f;
             document.querySelectorAll('.filter-btn').forEach(b => b.className = 'filter-btn px-4 py-2.5 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-100 transition-all');

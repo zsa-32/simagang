@@ -8,7 +8,8 @@ INSERT INTO roles (id, name) VALUES
 (1, 'admin'),
 (2, 'mahasiswa'),
 (3, 'dosen_pembimbing'),
-(4, 'pembimbing_lapang');
+(4, 'pembimbing_lapang'),
+(5, 'koordinator');
 
 -- 2. Default Admin User
 -- Password: admin123 (bcrypt hashed)

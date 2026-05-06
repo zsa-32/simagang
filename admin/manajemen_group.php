@@ -44,7 +44,7 @@ $dosens         = $conn->query("SELECT id, nama, nip FROM dosen_pembimbing ORDER
 $pembimbings    = $conn->query("SELECT pl.id, pl.nama, pl.jabatan, c.nama_perusahaan FROM pembimbing_lapang pl LEFT JOIN companies c ON pl.company_id = c.id ORDER BY pl.nama")->fetchAll();
 
 // Fetch all groups
-$groups = $conn->query("
+$kelompokList = $conn->query("
     SELECT g.*, c.nama_perusahaan, dp.nama as nama_dosen, pl.nama as nama_pembimbing,
            (SELECT COUNT(*) FROM mahasiswa m WHERE m.group_id = g.id) as total_mhs
     FROM `groups` g
@@ -55,6 +55,19 @@ $groups = $conn->query("
 ")->fetchAll();
 
 $adminName = $_SESSION['nama'] ?? 'Admin';
+
+// Fetch mahasiswa per group for member modal
+$mahasiswaPerGroup = [];
+$mhsRows = $conn->query("
+    SELECT m.group_id, m.nama, m.no_ktm, u.email
+    FROM mahasiswa m
+    LEFT JOIN users u ON m.user_id = u.id
+    WHERE m.group_id IS NOT NULL
+    ORDER BY m.nama
+")->fetchAll();
+foreach ($mhsRows as $mRow) {
+    $mahasiswaPerGroup[$mRow['group_id']][] = $mRow;
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -95,7 +108,7 @@ $adminName = $_SESSION['nama'] ?? 'Admin';
             <?php endif; ?>
 
             <!-- Group Cards -->
-            <?php if (empty($groups)): ?>
+            <?php if (empty($kelompokList)): ?>
             <div class="bg-white rounded-2xl p-10 text-center text-gray-400 shadow-sm border border-gray-100">
                 <i class="fas fa-layer-group text-4xl mb-3 block"></i>
                 <p class="font-medium">Belum ada kelompok magang</p>
@@ -103,7 +116,7 @@ $adminName = $_SESSION['nama'] ?? 'Admin';
             </div>
             <?php else: ?>
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                <?php foreach ($groups as $g): ?>
+                <?php foreach ($kelompokList as $g): ?>
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
                     <div class="flex items-start justify-between mb-4">
                         <div class="flex items-center gap-3">
@@ -115,10 +128,11 @@ $adminName = $_SESSION['nama'] ?? 'Admin';
                                 <span class="text-xs text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded-full mt-1 inline-block"><?= $g['total_mhs'] ?> Mahasiswa</span>
                             </div>
                         </div>
-                        <div class="flex gap-1.5">
-                            <button onclick='openEdit(<?= json_encode($g) ?>)' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors text-xs"><i class="fas fa-edit"></i></button>
-                            <button onclick="confirmHapus(<?= $g['id'] ?>, '<?= addslashes($g['name']) ?>')" class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors text-xs"><i class="fas fa-trash"></i></button>
-                        </div>
+                    <div class="flex gap-1.5">
+                            <button onclick='openEdit(<?= json_encode($g) ?>)' class="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors text-xs" title="Edit"><i class="fas fa-edit"></i></button>
+                            <button onclick="openAnggota(<?= $g['id'] ?>, '<?= addslashes($g['name']) ?>')" class="text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition-colors text-xs" title="Lihat Anggota"><i class="fas fa-users"></i></button>
+                            <button onclick="confirmHapus(<?= $g['id'] ?>, '<?= addslashes($g['name']) ?>')" class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors text-xs" title="Hapus"><i class="fas fa-trash"></i></button>
+                    </div>
                     </div>
                     <div class="space-y-2 text-xs text-gray-600">
                         <div class="flex items-center gap-2">
@@ -197,7 +211,32 @@ $adminName = $_SESSION['nama'] ?? 'Admin';
     </div>
 </div>
 
+<!-- Modal Anggota Kelompok -->
+<div id="modalAnggota" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div>
+                <h3 class="font-bold text-gray-800 text-lg" id="anggotaTitle">Anggota Kelompok</h3>
+                <p class="text-xs text-gray-400 mt-0.5" id="anggotaSubtitle"></p>
+            </div>
+            <button onclick="closeModal('modalAnggota')" class="text-gray-400 hover:text-gray-600 text-xl"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="px-6 py-5 max-h-80 overflow-y-auto" id="anggotaList">
+            <p class="text-sm text-gray-400 text-center py-6">Tidak ada mahasiswa di kelompok ini.</p>
+        </div>
+        <div class="px-6 pb-5">
+            <button onclick="closeModal('modalAnggota')" class="w-full py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<?php
+// Encode mahasiswa per group data to JS
+$mahasiswaJson = json_encode($mahasiswaPerGroup);
+?>
+
 <script>
+const mahasiswaData = <?= $mahasiswaJson ?>;
 function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 function openEdit(data) {
@@ -213,8 +252,29 @@ function confirmHapus(id, nama) {
     document.getElementById('hapusNama').textContent = nama;
     openModal('modalHapus');
 }
+function openAnggota(groupId, groupName) {
+    const list = mahasiswaData[groupId] || [];
+    document.getElementById('anggotaTitle').textContent = groupName;
+    document.getElementById('anggotaSubtitle').textContent = list.length + ' mahasiswa terdaftar';
+    const container = document.getElementById('anggotaList');
+    if (list.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-400 text-center py-6"><i class="fas fa-user-slash block text-2xl mb-2"></i>Belum ada mahasiswa di kelompok ini.</p>';
+    } else {
+        container.innerHTML = list.map((m, i) => `
+            <div class="flex items-center gap-3 py-2.5 ${i < list.length-1 ? 'border-b border-gray-50' : ''}">
+                <div class="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold shrink-0">${m.nama.charAt(0).toUpperCase()}</div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-gray-800 text-sm truncate">${m.nama}</p>
+                    <p class="text-xs text-gray-400">${m.no_ktm ? 'NIM: ' + m.no_ktm : m.email || '-'}</p>
+                </div>
+                <span class="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">#${i+1}</span>
+            </div>
+        `).join('');
+    }
+    openModal('modalAnggota');
+}
 window.addEventListener('click', function(e) {
-    ['modalTambah','modalEdit','modalHapus'].forEach(id => {
+    ['modalTambah','modalEdit','modalHapus','modalAnggota'].forEach(id => {
         if (e.target === document.getElementById(id)) closeModal(id);
     });
 });

@@ -213,7 +213,7 @@ function timeAgo($datetime) {
                     <h3 class="text-[15px] font-bold text-gray-900">Akses Cepat</h3>
                     <p class="text-[12px] text-gray-500 mb-5 mt-1">Navigasi ke fitur utama</p>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <a href="monitoring.php" class="border border-gray-100 rounded-xl p-5 hover:shadow-md transition-shadow group">
                             <div class="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
                                 <i class="fas fa-eye text-red-500"></i>
@@ -228,14 +228,6 @@ function timeAgo($datetime) {
                             </div>
                             <h4 class="font-semibold text-gray-800 text-[14px]">Statistik</h4>
                             <p class="text-[12px] text-gray-500 mt-1">Lihat statistik mahasiswa & perusahaan</p>
-                        </a>
-
-                        <a href="laporan.php" class="border border-gray-100 rounded-xl p-5 hover:shadow-md transition-shadow group">
-                            <div class="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                                <i class="fas fa-file-download text-orange-500"></i>
-                            </div>
-                            <h4 class="font-semibold text-gray-800 text-[14px]">Laporan Sistem</h4>
-                            <p class="text-[12px] text-gray-500 mt-1">Export laporan keseluruhan</p>
                         </a>
                     </div>
                 </div>
