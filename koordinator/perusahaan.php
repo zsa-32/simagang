@@ -54,8 +54,8 @@ $companies = $stmt->fetchAll();
                     <h2 class="text-2xl font-bold text-gray-900">Perusahaan Mitra</h2>
                     <p class="text-gray-500 text-sm mt-0.5">Daftar perusahaan tempat magang mahasiswa</p>
                 </div>
-                <button onclick="openModal('modalTambah')" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors">
-                    <i class="fas fa-plus"></i> Rekomendasikan Perusahaan
+                <button onclick="openModal('modalTambah')" class="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors">
+                    <i class="fas fa-plus"></i> Tambahkan Perusahaan
                 </button>
             </div>
 
@@ -69,8 +69,8 @@ $companies = $stmt->fetchAll();
             <form method="GET" class="flex gap-2">
                 <input type="text" name="q" value="<?= htmlspecialchars($search) ?>"
                        placeholder="Cari nama perusahaan atau bidang usaha..."
-                       class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300">
-                <button type="submit" class="bg-orange-500 text-white px-4 py-2.5 rounded-xl text-sm hover:bg-orange-600 transition-colors">
+                       class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2.5 rounded-xl text-sm hover:bg-blue-600 transition-colors">
                     <i class="fas fa-search"></i>
                 </button>
                 <?php if ($search): ?>
@@ -81,7 +81,7 @@ $companies = $stmt->fetchAll();
             <!-- Stats -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-center">
-                    <p class="text-2xl font-bold text-orange-500"><?= count($companies) ?></p>
+                    <p class="text-2xl font-bold text-blue-500"><?= count($companies) ?></p>
                     <p class="text-[12px] text-gray-500 mt-1">Total Perusahaan</p>
                 </div>
                 <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-center">
@@ -159,32 +159,32 @@ $companies = $stmt->fetchAll();
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="sm:col-span-2">
                     <label class="block text-[12px] font-semibold text-gray-500 mb-1.5">Nama Perusahaan <span class="text-red-500">*</span></label>
-                    <input type="text" name="nama_perusahaan" required class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400">
+                    <input type="text" name="nama_perusahaan" required class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
                 </div>
                 <div>
                     <label class="block text-[12px] font-semibold text-gray-500 mb-1.5">Bidang Usaha</label>
-                    <input type="text" name="bidang_usaha" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400">
+                    <input type="text" name="bidang_usaha" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
                 </div>
                 <div>
                     <label class="block text-[12px] font-semibold text-gray-500 mb-1.5">Contact Person</label>
-                    <input type="text" name="contact_person" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400">
+                    <input type="text" name="contact_person" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
                 </div>
                 <div>
                     <label class="block text-[12px] font-semibold text-gray-500 mb-1.5">No. HP</label>
-                    <input type="text" name="no_hp" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400">
+                    <input type="text" name="no_hp" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
                 </div>
                 <div>
                     <label class="block text-[12px] font-semibold text-gray-500 mb-1.5">Email Bisnis <span class="text-red-500">*</span></label>
-                    <input type="email" name="email_business" required class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400">
+                    <input type="email" name="email_business" required class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
                 </div>
                 <div class="sm:col-span-2">
                     <label class="block text-[12px] font-semibold text-gray-500 mb-1.5">Alamat</label>
-                    <input type="text" name="alamat_perusahaan" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400">
+                    <input type="text" name="alamat_perusahaan" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
                 </div>
             </div>
             <div class="flex justify-end gap-3 pt-2">
                 <button type="button" onclick="closeModal('modalTambah')" class="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Batal</button>
-                <button type="submit" class="px-5 py-2 rounded-xl bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600">Simpan</button>
+                <button type="submit" class="px-5 py-2 rounded-xl bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600">Simpan</button>
             </div>
         </form>
     </div>

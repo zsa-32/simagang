@@ -166,7 +166,7 @@
                                     <td class="px-8 py-5 text-center">
                                         <div class="flex items-center justify-center gap-2">
                                             <button title="Lihat Detail"
-                                                    onclick="previewJurnal(<?= json_encode(['id'=>$lb['id'],'tanggal'=>date('d M Y',$tgl),'kegiatan'=>$lb['kegiatan'],'hasil'=>$lb['hasil'],'dokumentasi'=>$lb['dokumentasi'],'status'=>$statusLabel]) ?>)"
+                                                    onclick='previewJurnal(<?= json_encode(['id'=>$lb['id'],'tanggal'=>date('d M Y',$tgl),'kegiatan'=>$lb['kegiatan'],'hasil'=>$lb['hasil'],'dokumentasi'=>$lb['dokumentasi'],'status'=>$statusLabel], JSON_UNESCAPED_UNICODE) ?>)'
                                                     class="text-blue-600 hover:text-blue-800 bg-blue-50/50 hover:bg-blue-100 border border-blue-100 p-2.5 rounded-[8px] transition-all">
                                                 <i class="fas fa-eye text-[14px]"></i>
                                             </button>
@@ -213,7 +213,7 @@
     </div>
 
 <!-- Modal Preview Jurnal -->
-<div id="modalPreviewJurnal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+<div id="modalPreviewJurnal" style="display:none" class="fixed inset-0 z-50 items-center justify-center bg-black/40 backdrop-blur-sm p-4">
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 class="text-[16px] font-bold text-gray-900">Detail Jurnal</h3>
@@ -240,9 +240,26 @@
                 </div>
                 <div id="pv-dok-wrap">
                     <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Dokumentasi</p>
-                    <div class="bg-blue-50 rounded-xl px-4 py-3 flex items-center gap-2">
-                        <i class="fas fa-image text-blue-400"></i>
-                        <span id="pv-dok" class="text-[13px] text-blue-700 font-medium"></span>
+                    <!-- Image Preview -->
+                    <div id="pv-img-wrap" class="hidden">
+                        <div class="relative group cursor-pointer" onclick="openImgFull()">
+                            <img id="pv-img" src="" alt="Dokumentasi" class="w-full max-h-64 object-contain rounded-xl border border-gray-200 bg-gray-50">
+                            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded-xl transition-all flex items-center justify-center">
+                                <span class="opacity-0 group-hover:opacity-100 bg-white text-gray-800 text-[12px] font-semibold px-3 py-1.5 rounded-full shadow transition-all">
+                                    <i class="fas fa-expand-alt mr-1"></i> Perbesar
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- File link (non-image) -->
+                    <div id="pv-file-wrap" class="hidden bg-blue-50 rounded-xl px-4 py-3 flex items-center gap-3">
+                        <i class="fas fa-file text-blue-400 text-lg"></i>
+                        <div class="flex-1 min-w-0">
+                            <p id="pv-dok" class="text-[13px] text-blue-700 font-medium truncate"></p>
+                        </div>
+                        <a id="pv-dok-link" href="#" target="_blank" class="shrink-0 text-[12px] text-blue-600 hover:text-blue-800 font-semibold bg-white px-3 py-1.5 rounded-lg border border-blue-200 hover:border-blue-400 transition-colors">
+                            <i class="fas fa-download mr-1"></i> Unduh
+                        </a>
                     </div>
                 </div>
             </div>
@@ -266,24 +283,68 @@
         const statusEl = document.getElementById('pv-status');
         statusEl.textContent = j.status;
         statusEl.className = 'px-3 py-1 rounded-full text-[12px] font-semibold ' + (statusClassMap[j.status] || 'bg-gray-100 text-gray-600');
-        const dokWrap = document.getElementById('pv-dok-wrap');
+        const dokWrap  = document.getElementById('pv-dok-wrap');
+        const imgWrap  = document.getElementById('pv-img-wrap');
+        const fileWrap = document.getElementById('pv-file-wrap');
+        const imgEl    = document.getElementById('pv-img');
+        const dokEl    = document.getElementById('pv-dok');
+        const dokLink  = document.getElementById('pv-dok-link');
+        const imageExts = ['jpg','jpeg','png','gif','webp','bmp'];
         if (j.dokumentasi) {
-            document.getElementById('pv-dok').textContent = j.dokumentasi;
+            const base = j.dokumentasi.split('/').pop();
+            const ext  = base.split('.').pop().toLowerCase();
+            const url  = '<?= rtrim(defined('BASE_URL') ? BASE_URL : 'http://localhost:8888/simagang/simagang/', '/') ?>/' + j.dokumentasi;
+            if (imageExts.includes(ext)) {
+                imgEl.src = url;
+                imgEl.dataset.src = url;
+                imgWrap.classList.remove('hidden');
+                fileWrap.classList.add('hidden');
+            } else {
+                dokEl.textContent  = base;
+                dokLink.href       = url;
+                fileWrap.classList.remove('hidden');
+                imgWrap.classList.add('hidden');
+            }
             dokWrap.classList.remove('hidden');
         } else {
             dokWrap.classList.add('hidden');
         }
-        document.getElementById('modalPreviewJurnal').classList.remove('hidden');
+        document.getElementById('modalPreviewJurnal').style.display = 'flex';
         document.body.style.overflow = 'hidden';
     }
     function closePreview() {
-        document.getElementById('modalPreviewJurnal').classList.add('hidden');
+        document.getElementById('modalPreviewJurnal').style.display = 'none';
         document.body.style.overflow = '';
     }
     document.getElementById('modalPreviewJurnal').addEventListener('click', function(e) {
         if (e.target === this) closePreview();
     });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closePreview(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeLightbox(); closePreview(); } });
+
+    // Lightbox fullscreen
+    function openImgFull() {
+        const src = document.getElementById('pv-img').src;
+        document.getElementById('lightboxImg').src = src;
+        document.getElementById('lightboxModal').style.display = 'flex';
+    }
+    function closeLightbox() {
+        document.getElementById('lightboxModal').style.display = 'none';
+        document.getElementById('lightboxImg').src = '';
+    }
+    document.getElementById('lightboxModal').addEventListener('click', function(e) {
+        if (e.target === this || e.target.id === 'lightboxImg') closeLightbox();
+    });
 </script>
+
+<!-- Lightbox Fullscreen -->
+<div id="lightboxModal" style="display:none" class="fixed inset-0 z-[60] bg-black/90 items-center justify-center p-4 backdrop-blur-sm">
+    <button onclick="closeLightbox()" class="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center text-white transition-colors z-10">
+        <i class="fas fa-times text-lg"></i>
+    </button>
+    <img id="lightboxImg" src="" alt="Dokumentasi Fullscreen"
+         class="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl cursor-zoom-out"
+         onclick="closeLightbox()">
+</div>
+
 </body>
 </html>

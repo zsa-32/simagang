@@ -27,29 +27,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 ->execute(['uid' => $newUserId, 'nama' => $name, 'nim' => $nomorInduk]);
             $newMhsId = (int)$conn->lastInsertId();
 
-            // Cari atau buat group berdasarkan dosen + company (dari pembimbing_lapang)
-            $dosenId   = (int)($_POST['dosen_id']   ?? 0);
-            $plId      = (int)($_POST['pl_id']       ?? 0);
-            $companyId = null;
-            if ($plId) {
-                $plRow = $conn->prepare("SELECT company_id FROM pembimbing_lapang WHERE id = ?");
-                $plRow->execute([$plId]);
-                $plData    = $plRow->fetch();
-                $companyId = $plData['company_id'] ?? null;
-            }
-            if ($dosenId || $plId) {
-                // Cari group yang cocok
-                $gStmt = $conn->prepare("SELECT id FROM `groups` WHERE dosen_pembimbing_id = ? AND pembimbing_lapang_id = ? LIMIT 1");
-                $gStmt->execute([$dosenId ?: null, $plId ?: null]);
-                $existingGroup = $gStmt->fetch();
-                if ($existingGroup) {
-                    $groupId = $existingGroup['id'];
-                } else {
-                    $conn->prepare("INSERT INTO `groups` (name, company_id, pembimbing_lapang_id, dosen_pembimbing_id) VALUES (:nm, :cid, :plid, :did)")
-                         ->execute(['nm' => 'Kelompok ' . $name, 'cid' => $companyId, 'plid' => $plId ?: null, 'did' => $dosenId ?: null]);
-                    $groupId = (int)$conn->lastInsertId();
-                }
+            $dosenId   = (int)($_POST['dosen_id']   ?? 0) ?: null;
+            $plId      = (int)($_POST['pl_id']       ?? 0) ?: null;
+            $companyId = (int)($_POST['company_id']  ?? 0) ?: null;
+            $groupId   = (int)($_POST['group_id']    ?? 0) ?: null;
+
+            if ($groupId) {
+                // Gunakan group yang sudah ada
                 $conn->prepare("UPDATE mahasiswa SET group_id = ? WHERE id = ?")->execute([$groupId, $newMhsId]);
+            } elseif ($dosenId || $plId || $companyId) {
+                // Buat group baru dari pilihan yang ada
+                $conn->prepare("INSERT INTO `groups` (name, company_id, pembimbing_lapang_id, dosen_pembimbing_id) VALUES (:nm, :cid, :plid, :did)")
+                     ->execute(['nm' => 'Kelompok ' . $name, 'cid' => $companyId, 'plid' => $plId, 'did' => $dosenId]);
+                $newGroupId = (int)$conn->lastInsertId();
+                $conn->prepare("UPDATE mahasiswa SET group_id = ? WHERE id = ?")->execute([$newGroupId, $newMhsId]);
             }
         } elseif ($roleInput === 'dosen') {
             $conn->prepare("INSERT INTO dosen_pembimbing (user_id, nama, nip, email) VALUES (:uid, :nama, :nip, :email)")
@@ -120,6 +111,17 @@ $roleColors = ['mahasiswa' => 'bg-blue-600', 'dosen_pembimbing' => 'bg-purple-60
 $dosenList    = $conn->query("SELECT id, nama FROM dosen_pembimbing ORDER BY nama")->fetchAll();
 $plList       = $conn->query("SELECT pl.id, pl.nama, c.nama_perusahaan FROM pembimbing_lapang pl LEFT JOIN companies c ON pl.company_id = c.id ORDER BY pl.nama")->fetchAll();
 $companiesList = $conn->query("SELECT id, nama_perusahaan FROM companies ORDER BY nama_perusahaan")->fetchAll();
+$groupsList   = $conn->query("
+    SELECT g.id, g.name,
+           c.nama_perusahaan,
+           dp.nama as dosen_nama,
+           pl.nama as pl_nama
+    FROM `groups` g
+    LEFT JOIN companies c ON g.company_id = c.id
+    LEFT JOIN dosen_pembimbing dp ON g.dosen_pembimbing_id = dp.id
+    LEFT JOIN pembimbing_lapang pl ON g.pembimbing_lapang_id = pl.id
+    ORDER BY g.name
+")->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -226,35 +228,52 @@ $companiesList = $conn->query("SELECT id, nama_perusahaan FROM companies ORDER B
                 <!-- Dropdown kondisional: Mahasiswa -->
                 <div id="fieldsMahasiswa" class="hidden space-y-3 border-t border-gray-100 pt-3">
                     <p class="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">Penempatan Magang</p>
-                    <div>
-                        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dosen Pembimbing</label>
-                        <select name="dosen_id" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white">
-                            <option value="">-- Pilih Dosen --</option>
-                            <?php foreach ($dosenList as $d): ?>
-                            <option value="<?= $d['id'] ?>"><?= htmlspecialchars($d['nama']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Pembimbing Lapang</label>
-                        <select name="pl_id" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white">
-                            <option value="">-- Pilih Pembimbing Lapang --</option>
-                            <?php foreach ($plList as $pl): ?>
-                            <option value="<?= $pl['id'] ?>"><?= htmlspecialchars($pl['nama']) ?><?= $pl['nama_perusahaan'] ? ' — ' . htmlspecialchars($pl['nama_perusahaan']) : '' ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                </div>
 
-                <!-- Dropdown kondisional: Pembimbing Lapang -->
-                <div id="fieldsPembimbing" class="hidden border-t border-gray-100 pt-3">
-                    <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Perusahaan</label>
-                    <select name="company_id" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white">
-                        <option value="">-- Pilih Perusahaan --</option>
-                        <?php foreach ($companiesList as $comp): ?>
-                        <option value="<?= $comp['id'] ?>"><?= htmlspecialchars($comp['nama_perusahaan']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dosen Pembimbing</label>
+                            <select name="dosen_id" id="sel_dosen" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white">
+                                <option value="">-- Pilih Dosen --</option>
+                                <?php foreach ($dosenList as $d): ?>
+                                <option value="<?= $d['id'] ?>"><?= htmlspecialchars($d['nama']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Pembimbing Lapang</label>
+                            <select name="pl_id" id="sel_pl" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white">
+                                <option value="">-- Pilih Pembimbing --</option>
+                                <?php foreach ($plList as $pl): ?>
+                                <option value="<?= $pl['id'] ?>"><?= htmlspecialchars($pl['nama']) ?><?= $pl['nama_perusahaan'] ? ' (' . htmlspecialchars($pl['nama_perusahaan']) . ')' : '' ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Perusahaan</label>
+                            <select name="company_id" id="sel_company" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white">
+                                <option value="">-- Pilih Perusahaan --</option>
+                                <?php foreach ($companiesList as $comp): ?>
+                                <option value="<?= $comp['id'] ?>"><?= htmlspecialchars($comp['nama_perusahaan']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Kelompok Magang <span class="text-gray-400 font-normal text-[11px]">(opsional)</span></label>
+                            <select name="group_id" id="sel_group" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white">
+                                <option value="">-- Buat Kelompok Baru --</option>
+                                <?php foreach ($groupsList as $grp): ?>
+                                <option value="<?= $grp['id'] ?>">
+                                    <?= htmlspecialchars($grp['name']) ?>
+                                    <?php
+                                        $parts = array_filter([$grp['nama_perusahaan'], $grp['dosen_nama'] ? 'Dosen: '.$grp['dosen_nama'] : null]);
+                                        if ($parts) echo ' (' . htmlspecialchars(implode(', ', $parts)) . ')';
+                                    ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-gray-400"><i class="fas fa-info-circle mr-1"></i>Pilih Kelompok Magang jika sudah ada, atau kosongkan untuk membuat kelompok baru dari kombinasi Dosen + Pembimbing + Perusahaan di atas.</p>
                 </div>
 
                 <div><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Password</label><input type="password" name="password" required minlength="8" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"></div>
@@ -283,22 +302,15 @@ $companiesList = $conn->query("SELECT id, nama_perusahaan FROM companies ORDER B
         function openModal() { document.getElementById('modalBuatAkun').classList.remove('hidden'); document.getElementById('modalBuatAkun').classList.add('flex'); }
         function closeModal() { document.getElementById('modalBuatAkun').classList.add('hidden'); document.getElementById('modalBuatAkun').classList.remove('flex'); }
         function updateRoleFields() {
-            const role = document.getElementById('selectRole').value;
-            const lbl  = document.getElementById('nidLabel');
+            const role      = document.getElementById('selectRole').value;
+            const lbl       = document.getElementById('nidLabel');
             const mhsFields = document.getElementById('fieldsMahasiswa');
-            const plFields  = document.getElementById('fieldsPembimbing');
             if (role === 'mahasiswa') {
                 lbl.textContent = 'NIM (Nomor Induk Mahasiswa)';
                 mhsFields.classList.remove('hidden');
-                plFields.classList.add('hidden');
-            } else if (role === 'pembimbing') {
-                lbl.textContent = 'Jabatan';
-                plFields.classList.remove('hidden');
-                mhsFields.classList.add('hidden');
             } else {
-                lbl.textContent = 'NIP';
+                lbl.textContent = role === 'pembimbing' ? 'Jabatan' : 'NIP';
                 mhsFields.classList.add('hidden');
-                plFields.classList.add('hidden');
             }
         }
         function setFilter(f) {
