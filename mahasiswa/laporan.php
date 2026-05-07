@@ -36,9 +36,9 @@
                         VALUES (:mid, :judul, :path, 'pending')
                     ");
                     $stmt->execute([
-                        'mid' => $mhsId,
+                        'mid'   => $mhsId,
                         'judul' => $file['name'],
-                        'path' => 'uploads/reports/' . $filename,
+                        'path'  => 'uploads/reports/' . $filename,
                     ]);
                     header("Location: laporan.php?uploaded=1");
                     exit;

@@ -8,7 +8,7 @@ $host = "localhost";
 $port = "3306";
 $db   = "simagang";
 $user = "root";
-$pass = "";
+$pass = "root";
 
 try {
     // Membuat koneksi dengan PDO
@@ -23,5 +23,5 @@ try {
 }
 
 // Base URL untuk frontend
-define('BASE_URL', 'http://localhost/simagang/');
+define('BASE_URL', 'http://localhost:8888/simagang/simagang/');
 ?>

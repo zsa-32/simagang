@@ -146,10 +146,9 @@ $mahasiswaList = $stmt->fetchAll();
                                     <td colspan="7" class="py-6 text-center text-gray-500 text-sm">Tidak ada data mahasiswa.</td>
                                 </tr>
                                 <?php else: ?>
-                                    <?php foreach($mahasiswaList as $m): 
+                                    <?php foreach($mahasiswaList as $loop_idx => $m): 
                                         // Progress Calculation (Estimating 60 journals = 100%)
                                         $progress = min(100, round(($m['total_jurnal'] / 60) * 100));
-                                        
                                         // Status Styling
                                         $statusStr = strtolower($m['status']);
                                         if ($statusStr === 'aktif' || $statusStr === 'berjalan') {
@@ -159,7 +158,7 @@ $mahasiswaList = $stmt->fetchAll();
                                         } elseif ($statusStr === 'selesai') {
                                             $statusClass = 'bg-green-50 text-green-600 border-green-100';
                                             $statusLabel = 'Selesai';
-                                            $progress = 100; // Force 100% if done
+                                            $progress = 100;
                                             $progColor = 'bg-green-500';
                                         } else {
                                             $statusClass = 'bg-red-50 text-red-600 border-red-100';
@@ -190,7 +189,7 @@ $mahasiswaList = $stmt->fetchAll();
                                             </div>
                                         </td>
                                         <td class="py-3 px-6 text-center">
-                                            <button class="w-8 h-8 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-500 transition-colors flex items-center justify-center mx-auto border border-gray-100">
+                                            <button onclick="openDetailModal(<?= $loop_idx ?>)" class="w-8 h-8 rounded-lg bg-gray-50 hover:bg-blue-50 text-gray-500 hover:text-blue-600 transition-colors flex items-center justify-center mx-auto border border-gray-100 hover:border-blue-200">
                                                 <i class="fas fa-eye text-[13px]"></i>
                                             </button>
                                         </td>
@@ -206,13 +205,67 @@ $mahasiswaList = $stmt->fetchAll();
         </main>
         
     </div>
-    
+
+<!-- Modal Detail Mahasiswa -->
+<div id="modalDetail" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div class="bg-gradient-to-r from-[#1e40af] to-[#3b66f5] h-20 rounded-t-2xl relative">
+            <button onclick="closeDetailModal()" class="absolute top-3 right-3 w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-colors">
+                <i class="fas fa-times text-white text-[12px]"></i>
+            </button>
+        </div>
+        <div class="px-6 py-5 space-y-4">
+            <div>
+                <h3 id="dm-nama" class="text-[18px] font-bold text-gray-900"></h3>
+                <p id="dm-nim" class="text-[13px] text-gray-400 mt-0.5"></p>
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-[13px]">
+                <div class="bg-gray-50 rounded-xl p-3">
+                    <p class="text-[11px] text-gray-400 mb-1">Perusahaan</p>
+                    <p id="dm-perusahaan" class="font-semibold text-gray-800"></p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3">
+                    <p class="text-[11px] text-gray-400 mb-1">Dosen Pembimbing</p>
+                    <p id="dm-dosen" class="font-semibold text-gray-800"></p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3">
+                    <p class="text-[11px] text-gray-400 mb-1">No. HP</p>
+                    <p id="dm-hp" class="font-semibold text-gray-800"></p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3">
+                    <p class="text-[11px] text-gray-400 mb-1">Email</p>
+                    <p id="dm-email" class="font-semibold text-gray-800 text-[12px] break-all"></p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3">
+                    <p class="text-[11px] text-gray-400 mb-1">Status</p>
+                    <p id="dm-status" class="font-semibold text-gray-800"></p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3">
+                    <p class="text-[11px] text-gray-400 mb-1">Total Jurnal</p>
+                    <p id="dm-jurnal" class="font-semibold text-gray-800"></p>
+                </div>
+            </div>
+            <div class="bg-blue-50 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-[12px] font-semibold text-blue-700">Progress Magang</p>
+                    <span id="dm-progress-pct" class="text-[12px] font-bold text-blue-700"></span>
+                </div>
+                <div class="w-full bg-blue-200 rounded-full h-2">
+                    <div id="dm-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all" style="width:0%"></div>
+                </div>
+            </div>
+        </div>
+        <div class="px-6 pb-5 flex justify-end">
+            <button onclick="closeDetailModal()" class="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-700 transition-colors">Tutup</button>
+        </div>
+    </div>
+</div>
+
     <script>
         // Simple client-side search
         document.getElementById('searchInput').addEventListener('keyup', function() {
             let filter = this.value.toLowerCase();
             let rows = document.querySelectorAll('#dataTable tbody tr');
-            
             rows.forEach(row => {
                 let nameCell = row.querySelector('.search-target');
                 if (nameCell) {
@@ -221,6 +274,42 @@ $mahasiswaList = $stmt->fetchAll();
                 }
             });
         });
+
+        const mhsData = <?= json_encode(array_values(array_map(fn($m) => [
+            'nama'       => $m['nama'],
+            'nim'        => $m['no_ktm'] ?? '-',
+            'email'      => $m['email'] ?? '-',
+            'hp'         => $m['no_hp'] ?? '-',
+            'perusahaan' => $m['nama_perusahaan'] ?? '-',
+            'dosen'      => $m['dosen_pembimbing'] ?? '-',
+            'status'     => $m['status'] ?? '-',
+            'jurnal'     => (int)$m['total_jurnal'],
+        ], $mahasiswaList)), JSON_UNESCAPED_UNICODE) ?>;
+
+        function openDetailModal(idx) {
+            const m = mhsData[idx];
+            document.getElementById('dm-nama').textContent = m.nama;
+            document.getElementById('dm-nim').textContent = m.nim;
+            document.getElementById('dm-email').textContent = m.email;
+            document.getElementById('dm-hp').textContent = m.hp;
+            document.getElementById('dm-perusahaan').textContent = m.perusahaan;
+            document.getElementById('dm-dosen').textContent = m.dosen;
+            document.getElementById('dm-status').textContent = m.status;
+            document.getElementById('dm-jurnal').textContent = m.jurnal + ' jurnal';
+            const prog = Math.min(100, Math.round((m.jurnal / 60) * 100));
+            document.getElementById('dm-progress-bar').style.width = prog + '%';
+            document.getElementById('dm-progress-pct').textContent = prog + '%';
+            document.getElementById('modalDetail').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeDetailModal() {
+            document.getElementById('modalDetail').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+        document.getElementById('modalDetail').addEventListener('click', function(e) {
+            if (e.target === this) closeDetailModal();
+        });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetailModal(); });
     </script>
 </body>
 </html>

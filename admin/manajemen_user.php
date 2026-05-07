@@ -8,28 +8,56 @@ $activePage = 'manajemen_user';
 // Handle create user
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'create') {
-        $name = trim($_POST['nama']);
-        $email = trim($_POST['email']);
-        $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
-        $roleInput = $_POST['role'];
+        $name       = trim($_POST['nama']);
+        $email      = trim($_POST['email']);
+        $password   = password_hash($_POST['password'], PASSWORD_DEFAULT);
+        $roleInput  = $_POST['role'];
         $nomorInduk = trim($_POST['nomor_induk']);
 
         $roleMap = ['mahasiswa' => 2, 'dosen' => 3, 'pembimbing' => 4, 'koordinator' => 5];
-        $roleId = $roleMap[$roleInput] ?? 2;
+        $roleId  = $roleMap[$roleInput] ?? 2;
 
         $stmt = $conn->prepare("INSERT INTO users (role_id, name, email, password) VALUES (:rid, :name, :email, :pw)");
         $stmt->execute(['rid' => $roleId, 'name' => $name, 'email' => $email, 'pw' => $password]);
         $newUserId = $conn->lastInsertId();
 
         if ($roleInput === 'mahasiswa') {
+            // Buat record mahasiswa
             $conn->prepare("INSERT INTO mahasiswa (user_id, nama, no_ktm, status) VALUES (:uid, :nama, :nim, 'Aktif')")
                 ->execute(['uid' => $newUserId, 'nama' => $name, 'nim' => $nomorInduk]);
+            $newMhsId = (int)$conn->lastInsertId();
+
+            // Cari atau buat group berdasarkan dosen + company (dari pembimbing_lapang)
+            $dosenId   = (int)($_POST['dosen_id']   ?? 0);
+            $plId      = (int)($_POST['pl_id']       ?? 0);
+            $companyId = null;
+            if ($plId) {
+                $plRow = $conn->prepare("SELECT company_id FROM pembimbing_lapang WHERE id = ?");
+                $plRow->execute([$plId]);
+                $plData    = $plRow->fetch();
+                $companyId = $plData['company_id'] ?? null;
+            }
+            if ($dosenId || $plId) {
+                // Cari group yang cocok
+                $gStmt = $conn->prepare("SELECT id FROM `groups` WHERE dosen_pembimbing_id = ? AND pembimbing_lapang_id = ? LIMIT 1");
+                $gStmt->execute([$dosenId ?: null, $plId ?: null]);
+                $existingGroup = $gStmt->fetch();
+                if ($existingGroup) {
+                    $groupId = $existingGroup['id'];
+                } else {
+                    $conn->prepare("INSERT INTO `groups` (name, company_id, pembimbing_lapang_id, dosen_pembimbing_id) VALUES (:nm, :cid, :plid, :did)")
+                         ->execute(['nm' => 'Kelompok ' . $name, 'cid' => $companyId, 'plid' => $plId ?: null, 'did' => $dosenId ?: null]);
+                    $groupId = (int)$conn->lastInsertId();
+                }
+                $conn->prepare("UPDATE mahasiswa SET group_id = ? WHERE id = ?")->execute([$groupId, $newMhsId]);
+            }
         } elseif ($roleInput === 'dosen') {
             $conn->prepare("INSERT INTO dosen_pembimbing (user_id, nama, nip, email) VALUES (:uid, :nama, :nip, :email)")
                 ->execute(['uid' => $newUserId, 'nama' => $name, 'nip' => $nomorInduk, 'email' => $email]);
         } elseif ($roleInput === 'pembimbing') {
-            $conn->prepare("INSERT INTO pembimbing_lapang (user_id, nama, jabatan, email) VALUES (:uid, :nama, :jbt, :email)")
-                ->execute(['uid' => $newUserId, 'nama' => $name, 'jbt' => $nomorInduk, 'email' => $email]);
+            $companyId = (int)($_POST['company_id'] ?? 0) ?: null;
+            $conn->prepare("INSERT INTO pembimbing_lapang (user_id, nama, jabatan, email, company_id) VALUES (:uid, :nama, :jbt, :email, :cid)")
+                ->execute(['uid' => $newUserId, 'nama' => $name, 'jbt' => $nomorInduk, 'email' => $email, 'cid' => $companyId]);
         } elseif ($roleInput === 'koordinator') {
             $conn->prepare("INSERT INTO koordinator (user_id, nama, nip, email) VALUES (:uid, :nama, :nip, :email)")
                 ->execute(['uid' => $newUserId, 'nama' => $name, 'nip' => $nomorInduk, 'email' => $email]);
@@ -87,6 +115,11 @@ $users = $stmt->fetchAll();
 $roleLabels = ['mahasiswa' => 'Mahasiswa', 'dosen_pembimbing' => 'Dosen Pembimbing', 'pembimbing_lapang' => 'Pembimbing Lapang', 'koordinator' => 'Koordinator'];
 $roleBadges = ['mahasiswa' => 'bg-blue-100 text-blue-700', 'dosen_pembimbing' => 'bg-purple-100 text-purple-700', 'pembimbing_lapang' => 'bg-teal-100 text-teal-700', 'koordinator' => 'bg-orange-100 text-orange-700'];
 $roleColors = ['mahasiswa' => 'bg-blue-600', 'dosen_pembimbing' => 'bg-purple-600', 'pembimbing_lapang' => 'bg-teal-600', 'koordinator' => 'bg-orange-500'];
+
+// Dropdown data for create modal
+$dosenList    = $conn->query("SELECT id, nama FROM dosen_pembimbing ORDER BY nama")->fetchAll();
+$plList       = $conn->query("SELECT pl.id, pl.nama, c.nama_perusahaan FROM pembimbing_lapang pl LEFT JOIN companies c ON pl.company_id = c.id ORDER BY pl.nama")->fetchAll();
+$companiesList = $conn->query("SELECT id, nama_perusahaan FROM companies ORDER BY nama_perusahaan")->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -179,16 +212,51 @@ $roleColors = ['mahasiswa' => 'bg-blue-600', 'dosen_pembimbing' => 'bg-purple-60
 
     <!-- Modal Buat Akun -->
     <div id="modalBuatAkun" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between mb-5"><h3 class="text-lg font-bold text-gray-900">Buat Akun Baru</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 transition-colors"><i class="fas fa-times text-lg"></i></button></div>
             <form method="POST" class="space-y-4">
                 <input type="hidden" name="action" value="create">
                 <div><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Nama Lengkap</label><input type="text" name="nama" required class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"></div>
                 <div><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Email</label><input type="email" name="email" required class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"></div>
                 <div class="grid grid-cols-2 gap-4">
-                    <div><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Role</label><select name="role" id="selectRole" required onchange="updateNidLabel()" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white"><option value="">Pilih role...</option><option value="mahasiswa">Mahasiswa</option><option value="dosen">Dosen Pembimbing</option><option value="pembimbing">Pembimbing Lapang</option><option value="koordinator">Koordinator</option></select></div>
+                    <div><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Role</label><select name="role" id="selectRole" required onchange="updateRoleFields()" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white"><option value="">Pilih role...</option><option value="mahasiswa">Mahasiswa</option><option value="dosen">Dosen Pembimbing</option><option value="pembimbing">Pembimbing Lapang</option><option value="koordinator">Koordinator</option></select></div>
                     <div><label id="nidLabel" class="block text-[13px] font-medium text-gray-700 mb-1.5">NIM/NIP</label><input type="text" name="nomor_induk" required class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"></div>
                 </div>
+
+                <!-- Dropdown kondisional: Mahasiswa -->
+                <div id="fieldsMahasiswa" class="hidden space-y-3 border-t border-gray-100 pt-3">
+                    <p class="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">Penempatan Magang</p>
+                    <div>
+                        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dosen Pembimbing</label>
+                        <select name="dosen_id" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white">
+                            <option value="">-- Pilih Dosen --</option>
+                            <?php foreach ($dosenList as $d): ?>
+                            <option value="<?= $d['id'] ?>"><?= htmlspecialchars($d['nama']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Pembimbing Lapang</label>
+                        <select name="pl_id" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white">
+                            <option value="">-- Pilih Pembimbing Lapang --</option>
+                            <?php foreach ($plList as $pl): ?>
+                            <option value="<?= $pl['id'] ?>"><?= htmlspecialchars($pl['nama']) ?><?= $pl['nama_perusahaan'] ? ' — ' . htmlspecialchars($pl['nama_perusahaan']) : '' ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Dropdown kondisional: Pembimbing Lapang -->
+                <div id="fieldsPembimbing" class="hidden border-t border-gray-100 pt-3">
+                    <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Perusahaan</label>
+                    <select name="company_id" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 bg-white">
+                        <option value="">-- Pilih Perusahaan --</option>
+                        <?php foreach ($companiesList as $comp): ?>
+                        <option value="<?= $comp['id'] ?>"><?= htmlspecialchars($comp['nama_perusahaan']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
                 <div><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Password</label><input type="password" name="password" required minlength="8" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"></div>
                 <div class="flex items-center gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 py-2.5 border border-gray-200 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-50">Batal</button><button type="submit" class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-700">Simpan</button></div>
             </form>
@@ -214,12 +282,24 @@ $roleColors = ['mahasiswa' => 'bg-blue-600', 'dosen_pembimbing' => 'bg-purple-60
         let currentFilter = 'semua';
         function openModal() { document.getElementById('modalBuatAkun').classList.remove('hidden'); document.getElementById('modalBuatAkun').classList.add('flex'); }
         function closeModal() { document.getElementById('modalBuatAkun').classList.add('hidden'); document.getElementById('modalBuatAkun').classList.remove('flex'); }
-        function updateNidLabel() {
+        function updateRoleFields() {
             const role = document.getElementById('selectRole').value;
-            const lbl = document.getElementById('nidLabel');
-            if (role === 'mahasiswa') lbl.textContent = 'NIM (Nomor Induk Mahasiswa)';
-            else if (role === 'pembimbing') lbl.textContent = 'Jabatan';
-            else lbl.textContent = 'NIP';
+            const lbl  = document.getElementById('nidLabel');
+            const mhsFields = document.getElementById('fieldsMahasiswa');
+            const plFields  = document.getElementById('fieldsPembimbing');
+            if (role === 'mahasiswa') {
+                lbl.textContent = 'NIM (Nomor Induk Mahasiswa)';
+                mhsFields.classList.remove('hidden');
+                plFields.classList.add('hidden');
+            } else if (role === 'pembimbing') {
+                lbl.textContent = 'Jabatan';
+                plFields.classList.remove('hidden');
+                mhsFields.classList.add('hidden');
+            } else {
+                lbl.textContent = 'NIP';
+                mhsFields.classList.add('hidden');
+                plFields.classList.add('hidden');
+            }
         }
         function setFilter(f) {
             currentFilter = f;

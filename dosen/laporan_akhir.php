@@ -31,15 +31,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['laporan_id'])) {
 $laporan = [];
 if ($dosenId) {
     $stmt = $conn->prepare("
-        SELECT fr.*, p.nama_project, m.nama as nama_mhs,
+        SELECT fr.*, m.nama as nama_mhs, c.nama_perusahaan,
                (SELECT COUNT(*) FROM final_report_feedbacks frf WHERE frf.final_report_id = fr.id) as total_feedback
         FROM final_reports fr
-        JOIN projects p ON fr.project_id = p.id
-        JOIN mahasiswa m ON p.mahasiswa_id = m.id
-        WHERE p.dosen_pembimbing_id = ?
+        JOIN mahasiswa m ON fr.mahasiswa_id = m.id
+        JOIN `groups` g ON m.group_id = g.id
+        LEFT JOIN companies c ON g.company_id = c.id
+        WHERE g.dosen_pembimbing_id = :did
         ORDER BY fr.created_at DESC
     ");
-    $stmt->execute([$dosenId]);
+    $stmt->execute(['did' => $dosenId]);
     $laporan = $stmt->fetchAll();
 }
 
@@ -106,7 +107,9 @@ $statusBadge = ['pending' => 'yellow', 'review' => 'blue', 'disetujui' => 'green
                                 </div>
                                 <div class="flex gap-4 mt-2 text-sm text-gray-500">
                                     <span class="flex items-center gap-1.5"><i class="fas fa-user-graduate text-xs"></i><?= htmlspecialchars($l['nama_mhs']) ?></span>
-                                    <span class="flex items-center gap-1.5"><i class="fas fa-tasks text-xs"></i><?= htmlspecialchars($l['nama_project']) ?></span>
+                                    <?php if (!empty($l['nama_perusahaan'])): ?>
+                                    <span class="flex items-center gap-1.5"><i class="fas fa-building text-xs"></i><?= htmlspecialchars($l['nama_perusahaan']) ?></span>
+                                    <?php endif; ?>
                                 </div>
                                 <?php if ($l['ringkasan']): ?>
                                 <p class="text-sm text-gray-600 mt-3 leading-relaxed"><?= nl2br(htmlspecialchars($l['ringkasan'])) ?></p>

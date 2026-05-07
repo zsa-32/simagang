@@ -165,7 +165,9 @@
                                     </td>
                                     <td class="px-8 py-5 text-center">
                                         <div class="flex items-center justify-center gap-2">
-                                            <button title="Lihat Detail" class="text-blue-600 hover:text-blue-800 bg-blue-50/50 hover:bg-blue-100 border border-blue-100 p-2.5 rounded-[8px] transition-all">
+                                            <button title="Lihat Detail"
+                                                    onclick="previewJurnal(<?= json_encode(['id'=>$lb['id'],'tanggal'=>date('d M Y',$tgl),'kegiatan'=>$lb['kegiatan'],'hasil'=>$lb['hasil'],'dokumentasi'=>$lb['dokumentasi'],'status'=>$statusLabel]) ?>)"
+                                                    class="text-blue-600 hover:text-blue-800 bg-blue-50/50 hover:bg-blue-100 border border-blue-100 p-2.5 rounded-[8px] transition-all">
                                                 <i class="fas fa-eye text-[14px]"></i>
                                             </button>
                                             <?php if ($lb['status'] === 'pending'): ?>
@@ -210,5 +212,78 @@
         <?php include '../includes/footer.php'; ?>
     </div>
 
+<!-- Modal Preview Jurnal -->
+<div id="modalPreviewJurnal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <h3 class="text-[16px] font-bold text-gray-900">Detail Jurnal</h3>
+            <button onclick="closePreview()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+        </div>
+        <div class="px-6 py-5 space-y-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2 text-[13px] text-gray-500">
+                    <i class="fas fa-calendar-alt text-blue-400"></i>
+                    <span id="pv-tanggal" class="font-semibold text-gray-700"></span>
+                </div>
+                <span id="pv-status" class="px-3 py-1 rounded-full text-[12px] font-semibold"></span>
+            </div>
+            <div class="border-t border-gray-100 pt-4 space-y-4">
+                <div>
+                    <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Kegiatan</p>
+                    <p id="pv-kegiatan" class="text-[14px] text-gray-800 leading-relaxed bg-gray-50 rounded-xl px-4 py-3"></p>
+                </div>
+                <div>
+                    <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Hasil</p>
+                    <p id="pv-hasil" class="text-[14px] text-gray-800 leading-relaxed bg-gray-50 rounded-xl px-4 py-3"></p>
+                </div>
+                <div id="pv-dok-wrap">
+                    <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Dokumentasi</p>
+                    <div class="bg-blue-50 rounded-xl px-4 py-3 flex items-center gap-2">
+                        <i class="fas fa-image text-blue-400"></i>
+                        <span id="pv-dok" class="text-[13px] text-blue-700 font-medium"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-100 flex justify-end">
+            <button onclick="closePreview()" class="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-700 transition-colors">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const statusClassMap = {
+        'Disetujui': 'bg-green-100 text-green-700',
+        'Ditolak':   'bg-red-100 text-red-600',
+        'Pending':   'bg-yellow-100 text-yellow-700',
+    };
+    function previewJurnal(j) {
+        document.getElementById('pv-tanggal').textContent = j.tanggal;
+        document.getElementById('pv-kegiatan').textContent = j.kegiatan || '-';
+        document.getElementById('pv-hasil').textContent = j.hasil || '-';
+        const statusEl = document.getElementById('pv-status');
+        statusEl.textContent = j.status;
+        statusEl.className = 'px-3 py-1 rounded-full text-[12px] font-semibold ' + (statusClassMap[j.status] || 'bg-gray-100 text-gray-600');
+        const dokWrap = document.getElementById('pv-dok-wrap');
+        if (j.dokumentasi) {
+            document.getElementById('pv-dok').textContent = j.dokumentasi;
+            dokWrap.classList.remove('hidden');
+        } else {
+            dokWrap.classList.add('hidden');
+        }
+        document.getElementById('modalPreviewJurnal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+    function closePreview() {
+        document.getElementById('modalPreviewJurnal').classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+    document.getElementById('modalPreviewJurnal').addEventListener('click', function(e) {
+        if (e.target === this) closePreview();
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closePreview(); });
+</script>
 </body>
 </html>

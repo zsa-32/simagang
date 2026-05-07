@@ -10,10 +10,8 @@ $menus = [
         ['title' => 'Dashboard',      'icon' => 'fa-chart-line',    'url' => 'dashboard.php',       'id' => 'dashboard'],
         ['title' => 'Jurnal',          'icon' => 'fa-book',          'url' => 'jurnal.php',           'id' => 'jurnal'],
         ['title' => 'Absensi',         'icon' => 'fa-calendar-check','url' => 'absen.php',            'id' => 'absen'],
-        ['title' => 'Project',         'icon' => 'fa-tasks',         'url' => 'project.php',          'id' => 'project'],
         ['title' => 'Laporan Akhir',   'icon' => 'fa-file-alt',      'url' => 'laporan.php',          'id' => 'laporan'],
         ['title' => 'Lihat Nilai',     'icon' => 'fa-star',          'url' => 'nilai.php',            'id' => 'nilai'],
-        ['title' => 'Kontak Darurat',  'icon' => 'fa-phone-alt',     'url' => 'kontak_darurat.php',   'id' => 'kontak_darurat'],
     ],
     'admin' => [
         ['title' => 'Dashboard',             'icon' => 'fa-th-large',           'url' => 'dashboard.php',             'id' => 'dashboard',             'group' => 'MENU UTAMA'],
@@ -32,17 +30,21 @@ $menus = [
         ['title' => 'Presensi',            'icon' => 'fa-user-check',    'url' => 'presensi_mhs.php',   'id' => 'presensi'],
         ['title' => 'Penilaian',           'icon' => 'fa-clipboard-list','url' => 'penilaian.php',      'id' => 'penilaian'],
         ['title' => 'Laporan Akhir',       'icon' => 'fa-book-open',     'url' => 'laporan_akhir.php',  'id' => 'laporan_akhir'],
+        ['title' => 'Profil Saya',         'icon' => 'fa-user-circle',   'url' => 'profil.php',         'id' => 'profil'],
     ],
     'pembimbing' => [
-        ['title' => 'Dashboard',             'icon' => 'fa-th-large',      'url' => 'dashboard.php',              'id' => 'dashboard',             'group' => 'MENU UTAMA'],
-        ['title' => 'Monitoring Mahasiswa',  'icon' => 'fa-user-graduate', 'url' => 'monitoring_mahasiswa.php',   'id' => 'monitoring_mahasiswa',  'group' => 'MENU UTAMA'],
-        ['title' => 'Absensi Mahasiswa',     'icon' => 'fa-calendar-check','url' => 'absensi_mahasiswa.php',      'id' => 'absensi_mahasiswa',     'group' => 'MENU UTAMA'],
-        ['title' => 'Feedback Jurnal',       'icon' => 'fa-comments',      'url' => 'feedback_jurnal.php',        'id' => 'feedback_jurnal',       'group' => 'MENU UTAMA'],
+        ['title' => 'Dashboard',             'icon' => 'fa-th-large',      'url' => 'dashboard.php',              'id' => 'dashboard',            'group' => 'MENU UTAMA'],
+        ['title' => 'Monitoring Mahasiswa',  'icon' => 'fa-user-graduate', 'url' => 'monitoring_mahasiswa.php',   'id' => 'monitoring_mahasiswa', 'group' => 'MENU UTAMA'],
+        ['title' => 'Absensi Mahasiswa',     'icon' => 'fa-calendar-check','url' => 'absensi_mahasiswa.php',      'id' => 'absensi_mahasiswa',    'group' => 'MENU UTAMA'],
+        ['title' => 'Feedback Jurnal',       'icon' => 'fa-comments',      'url' => 'feedback_jurnal.php',        'id' => 'feedback_jurnal',      'group' => 'MENU UTAMA'],
+        ['title' => 'Profil Saya',           'icon' => 'fa-user-circle',   'url' => 'profil.php',                 'id' => 'profil',               'group' => 'AKUN'],
     ],
     'koordinator' => [
         ['title' => 'Dashboard',             'icon' => 'fa-th-large',      'url' => 'dashboard.php',     'id' => 'dashboard'],
         ['title' => 'Monitoring Program',    'icon' => 'fa-eye',           'url' => 'monitoring.php',    'id' => 'monitoring'],
         ['title' => 'Statistik',             'icon' => 'fa-chart-bar',     'url' => 'statistik.php',     'id' => 'statistik'],
+        ['title' => 'Perusahaan Mitra',      'icon' => 'fa-building',      'url' => 'perusahaan.php',    'id' => 'perusahaan'],
+        ['title' => 'Profil Saya',           'icon' => 'fa-user-circle',   'url' => 'profil.php',        'id' => 'profil'],
     ],
 ];
 
