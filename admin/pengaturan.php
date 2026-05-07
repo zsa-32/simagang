@@ -61,7 +61,7 @@ $komponen = [
 <body class="flex h-screen overflow-hidden text-gray-800">
     <?php include '../includes/sidebar.php'; ?>
     <div class="flex-1 flex flex-col h-screen overflow-hidden">
-        <?php include '../includes/header.php'; ?>
+        <?php include '../includes/headeradmin.php'; ?>
         <main class="flex-1 overflow-y-auto p-6 md:p-8 bg-[#f8f9fa]">
             <div class="max-w-[1200px] mx-auto space-y-6">
                 <div><h2 class="text-2xl font-bold text-gray-900">Pengaturan Sistem</h2><p class="text-gray-500 text-sm mt-0.5">Konfigurasi bobot penilaian dan generate nilai akhir</p></div>

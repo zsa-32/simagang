@@ -103,7 +103,7 @@ $belumAbsenHariIni = (int)$conn->prepare("
     <div class="flex-1 flex flex-col h-screen overflow-hidden">
 
         <!-- Header -->
-        <?php include '../includes/header.php'; ?>
+        <?php include '../includes/headeradmin.php'; ?>
 
         <!-- Main Content Area -->
         <main class="flex-1 overflow-y-auto p-6 md:p-8 bg-[#f8f9fa]">

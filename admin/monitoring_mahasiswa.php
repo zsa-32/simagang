@@ -69,7 +69,7 @@ $jurnalLabels = ['approved' => 'Disetujui', 'pending' => 'Menunggu', 'rejected' 
 <body class="flex h-screen overflow-hidden text-gray-800">
     <?php include '../includes/sidebar.php'; ?>
     <div class="flex-1 flex flex-col h-screen overflow-hidden">
-        <?php include '../includes/header.php'; ?>
+        <?php include '../includes/headeradmin.php'; ?>
         <main class="flex-1 overflow-y-auto p-6 md:p-8 bg-[#f8f9fa]">
             <div class="max-w-[1200px] mx-auto space-y-6">
                 <div class="flex items-start justify-between">
