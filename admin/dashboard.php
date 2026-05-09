@@ -118,7 +118,7 @@ $belumAbsenHariIni = (int)$conn->prepare("
                 <!-- Stats Cards -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <!-- Total Mahasiswa -->
-                    <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-start justify-between">
+                    <a href="monitoring_mahasiswa.php" class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-start justify-between transition-all duration-200 hover:shadow-md hover:border-blue-200 hover:-translate-y-0.5 cursor-pointer group">
                         <div>
                             <p class="text-[13px] text-gray-500 font-medium mb-1">Total Mahasiswa Magang</p>
                             <p class="text-3xl font-bold text-gray-900"><?= $totalMhs ?></p>
@@ -126,32 +126,32 @@ $belumAbsenHariIni = (int)$conn->prepare("
                                 <i class="fas fa-users text-[11px]"></i> <?= $totalAktif ?> aktif saat ini
                             </p>
                         </div>
-                        <div class="bg-blue-100 text-blue-600 w-11 h-11 rounded-xl flex items-center justify-center shrink-0">
+                        <div class="bg-blue-100 text-blue-600 w-11 h-11 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-blue-200 transition-colors duration-200">
                             <i class="fas fa-graduation-cap text-lg"></i>
                         </div>
-                    </div>
+                    </a>
                     <!-- Dosen Pembimbing -->
-                    <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-start justify-between">
+                    <a href="monitoring_dosen.php" class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-start justify-between transition-all duration-200 hover:shadow-md hover:border-blue-200 hover:-translate-y-0.5 cursor-pointer group">
                         <div>
                             <p class="text-[13px] text-gray-500 font-medium mb-1">Dosen Pembimbing</p>
                             <p class="text-3xl font-bold text-gray-900"><?= $totalDosen ?></p>
                             <p class="text-[12px] text-gray-400 font-medium mt-1.5">Terdaftar di sistem</p>
                         </div>
-                        <div class="bg-blue-100 text-blue-600 w-11 h-11 rounded-xl flex items-center justify-center shrink-0">
+                        <div class="bg-blue-100 text-blue-600 w-11 h-11 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-blue-200 transition-colors duration-200">
                             <i class="fas fa-chalkboard-teacher text-lg"></i>
                         </div>
-                    </div>
+                    </a>
                     <!-- Perusahaan Mitra -->
-                    <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-start justify-between">
+                    <a href="manajemen_perusahaan.php" class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-start justify-between transition-all duration-200 hover:shadow-md hover:border-blue-200 hover:-translate-y-0.5 cursor-pointer group">
                         <div>
                             <p class="text-[13px] text-gray-500 font-medium mb-1">Perusahaan Mitra</p>
                             <p class="text-3xl font-bold text-gray-900"><?= $totalCompany ?></p>
                             <p class="text-[12px] text-gray-400 font-medium mt-1.5">Mitra kerja sama</p>
                         </div>
-                        <div class="bg-blue-100 text-blue-600 w-11 h-11 rounded-xl flex items-center justify-center shrink-0">
+                        <div class="bg-blue-100 text-blue-600 w-11 h-11 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-blue-200 transition-colors duration-200">
                             <i class="fas fa-building text-lg"></i>
                         </div>
-                    </div>
+                    </a>
                     <!-- Magang Selesai -->
                     <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-start justify-between">
                         <div>
