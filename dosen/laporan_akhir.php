@@ -118,7 +118,7 @@ $statusBadge = ['pending' => 'yellow', 'review' => 'blue', 'disetujui' => 'green
                             <div class="text-right shrink-0">
                                 <p class="text-xs text-gray-400"><?= date('d M Y', strtotime($l['created_at'])) ?></p>
                                 <?php if ($l['file_path']): ?>
-                                <a href="../uploads/<?= htmlspecialchars($l['file_path']) ?>" target="_blank"
+                                <a href="../<?= htmlspecialchars($l['file_path']) ?>" target="_blank"
                                    class="inline-flex items-center gap-1.5 mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium bg-blue-50 px-3 py-1.5 rounded-lg">
                                     <i class="fas fa-download"></i> Download File
                                 </a>

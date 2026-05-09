@@ -48,15 +48,29 @@
     }
     if (isset($_GET['uploaded'])) { $message = 'Laporan berhasil diupload!'; $msgType = 'green'; }
 
-    // Get report history
+    // Get report history with feedbacks
     $stmt = $conn->prepare("
-        SELECT id, judul_laporan, file_path, status, created_at
-        FROM final_reports
-        WHERE mahasiswa_id = :mid
-        ORDER BY created_at DESC
+        SELECT fr.id, fr.judul_laporan, fr.file_path, fr.status, fr.created_at
+        FROM final_reports fr
+        WHERE fr.mahasiswa_id = :mid
+        ORDER BY fr.created_at DESC
     ");
     $stmt->execute(['mid' => $mhsId]);
     $reports = $stmt->fetchAll();
+
+    // Fetch feedbacks per laporan
+    $feedbacks = [];
+    foreach ($reports as $rpt) {
+        $fstmt = $conn->prepare("
+            SELECT frf.feedback, frf.created_at, u.name as penilai
+            FROM final_report_feedbacks frf
+            JOIN users u ON frf.penilai_user_id = u.id
+            WHERE frf.final_report_id = :rid
+            ORDER BY frf.created_at DESC
+        ");
+        $fstmt->execute(['rid' => $rpt['id']]);
+        $feedbacks[$rpt['id']] = $fstmt->fetchAll();
+    }
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -162,22 +176,54 @@
                                 <tr><td colspan="3" class="px-6 py-8 text-center text-gray-400">Belum ada laporan yang diupload.</td></tr>
                                 <?php else: ?>
                                 <?php foreach ($reports as $rpt):
-                                    $statusColor = match($rpt['status']) { 'approved' => 'text-[#10b981]', 'rejected' => 'text-[#ef4444]', default => 'text-[#f97316]' };
-                                    $statusLabel = match($rpt['status']) { 'approved' => 'Approved', 'rejected' => 'Rejected', default => 'Pending' };
+                                    $st = $rpt['status'];
+                                    [$statusColor, $statusLabel, $statusBg] = match($st) {
+                                        'disetujui' => ['text-green-700',  'Disetujui', 'bg-green-100'],
+                                        'review'    => ['text-blue-700',   'Direview',  'bg-blue-100'],
+                                        'revisi'    => ['text-red-700',    'Revisi',    'bg-red-100'],
+                                        default     => ['text-orange-600', 'Pending',   'bg-orange-100'],
+                                    };
+                                    $rptFeedbacks = $feedbacks[$rpt['id']] ?? [];
                                 ?>
                                 <tr class="hover:bg-gray-50/50 transition-colors">
                                     <td class="px-6 md:px-8 py-5">
                                         <div class="flex items-center gap-3">
                                             <div class="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center shrink-0"><i class="fas fa-file-pdf text-red-500 text-[15px]"></i></div>
-                                            <span class="font-medium text-gray-800"><?= htmlspecialchars($rpt['judul_laporan']) ?></span>
+                                            <div>
+                                                <span class="font-medium text-gray-800 block"><?= htmlspecialchars($rpt['judul_laporan']) ?></span>
+                                                <?php if ($rpt['file_path']): ?>
+                                                <a href="../<?= htmlspecialchars($rpt['file_path']) ?>" target="_blank" class="text-[12px] text-blue-500 hover:underline">
+                                                    <i class="fas fa-download mr-0.5"></i> Download
+                                                </a>
+                                                <?php endif; ?>
+                                            </div>
                                         </div>
                                     </td>
                                     <td class="px-6 py-5 text-gray-500 text-center"><?= date('d M Y', strtotime($rpt['created_at'])) ?></td>
                                     <td class="px-6 py-5 text-center">
-                                        <span class="<?= $statusColor ?> font-semibold text-[13px]"><?= $statusLabel ?></span>
+                                        <span class="<?= $statusBg ?> <?= $statusColor ?> font-semibold text-[12px] px-2.5 py-1 rounded-full"><?= $statusLabel ?></span>
                                     </td>
                                 </tr>
+                                <?php if (!empty($rptFeedbacks)): ?>
+                                <tr class="bg-blue-50/40">
+                                    <td colspan="3" class="px-6 md:px-8 py-3">
+                                        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Feedback Dosen</p>
+                                        <div class="space-y-2">
+                                        <?php foreach ($rptFeedbacks as $fb): ?>
+                                            <div class="flex items-start gap-2">
+                                                <i class="fas fa-comment-dots text-blue-400 mt-0.5 text-[12px]"></i>
+                                                <div>
+                                                    <p class="text-[13px] text-gray-700"><?= nl2br(htmlspecialchars($fb['feedback'])) ?></p>
+                                                    <p class="text-[11px] text-gray-400 mt-0.5"><?= htmlspecialchars($fb['penilai']) ?> · <?= date('d M Y, H:i', strtotime($fb['created_at'])) ?></p>
+                                                </div>
+                                            </div>
+                                        <?php endforeach; ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endif; ?>
                                 <?php endforeach; ?>
+
                                 <?php endif; ?>
                             </tbody>
                         </table>
