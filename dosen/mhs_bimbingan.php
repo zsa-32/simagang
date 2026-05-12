@@ -14,9 +14,12 @@
     // Get all mahasiswa bimbingan with related data
     $stmt = $conn->prepare("
         SELECT m.id, m.nama, m.no_ktm, m.no_hp, m.status,
+               m.jenis_kelamin, m.tempat_lahir, m.tanggal_lahir, m.agama, m.golongan_darah,
+               m.alamat_asal, m.alamat_jember,
                u.email,
                c.nama_perusahaan, c.alamat_perusahaan,
-               pl.nama as pl_nama,
+               pl.nama as pl_nama, pl.jabatan as pl_jabatan,
+               g.name as nama_kelompok,
                g.created_at as magang_mulai
         FROM mahasiswa m
         JOIN `groups` g ON m.group_id = g.id
@@ -88,9 +91,16 @@
         $students[] = [
             'nama' => $s['nama'],
             'nim' => $s['no_ktm'] ?? '-',
+            'jenis_kelamin' => $s['jenis_kelamin'] ?? '-',
+            'tempat_lahir' => $s['tempat_lahir'] ?? '-',
+            'tanggal_lahir' => $s['tanggal_lahir'] ?? null,
+            'agama' => $s['agama'] ?? '-',
+            'golongan_darah' => $s['golongan_darah'] ?? '-',
             'instansi' => $s['nama_perusahaan'] ?? '-',
             'alamat' => $s['alamat_perusahaan'] ?? '-',
             'pembimbing' => $s['pl_nama'] ?? '-',
+            'jabatan_pl' => $s['pl_jabatan'] ?? '-',
+            'nama_kelompok' => $s['nama_kelompok'] ?? '-',
             'periode' => $magang_mulai,
             'status' => $s['status'] ?? 'Aktif',
             'telp' => $s['no_hp'] ?? '-',
@@ -98,7 +108,6 @@
             'hadir' => $hadir,
             'izin' => $izin,
             'tidakHadir' => $alpha,
-            'catatan' => $feedback,
             'badges' => $badges,
         ];
     }
@@ -126,12 +135,30 @@
         body { font-family: 'Inter', sans-serif; background-color: #f8f9fa; }
         .student-card { transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer; }
         .student-card:hover { transform: translateY(-3px); box-shadow: 0 12px 30px -8px rgba(0,0,0,0.13); }
-        #studentModal { transition: opacity 0.25s ease; }
-        #studentModal.hidden { opacity: 0; pointer-events: none; }
-        #studentModal:not(.hidden) { opacity: 1; }
-        #modalBox { transition: transform 0.3s cubic-bezier(.34,1.56,.64,1), opacity 0.25s ease; }
-        #studentModal.hidden #modalBox { transform: scale(0.92) translateY(20px); opacity: 0; }
-        #studentModal:not(.hidden) #modalBox { transform: scale(1) translateY(0); opacity: 1; }
+        /* Detail Modal */
+        .modal-overlay {
+            position: fixed; inset: 0; z-index: 50;
+            background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-panel {
+            background: #fff; border-radius: 1.25rem; width: 95%; max-width: 620px;
+            max-height: 85vh; overflow-y: auto;
+            box-shadow: 0 25px 60px -12px rgba(0,0,0,0.25);
+            transform: translateY(20px) scale(0.97);
+            transition: transform 0.3s cubic-bezier(.22,1,.36,1);
+        }
+        .modal-overlay.active .modal-panel {
+            transform: translateY(0) scale(1);
+        }
+        .modal-panel::-webkit-scrollbar { width: 6px; }
+        .modal-panel::-webkit-scrollbar-track { background: transparent; }
+        .modal-panel::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+        .detail-label { font-size: 12px; color: #9ca3af; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+        .detail-value { font-size: 14px; color: #1f2937; font-weight: 500; margin-top: 2px; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-gray-800">
@@ -225,42 +252,59 @@
         <?php include '../includes/footer.php'; ?>
     </div>
 
-    <!-- MODAL -->
-    <div id="studentModal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onclick="closeModalOnBackdrop(event)">
-        <div id="modalBox" class="bg-white rounded-3xl w-full max-w-[520px] max-h-[90vh] overflow-y-auto shadow-2xl relative">
-            <div class="bg-gradient-to-r from-[#1e40af] to-[#3b66f5] h-28 rounded-t-3xl relative">
-                <button onclick="closeModal()" class="absolute top-4 right-4 w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-colors"><i class="fas fa-times text-white text-[13px]"></i></button>
-                <div id="m-avatar" class="absolute -bottom-7 left-6 w-16 h-16 rounded-full bg-gray-800 border-4 border-white flex items-center justify-center text-white font-bold text-[18px] shadow-lg"></div>
+    <!-- Detail Modal -->
+    <div id="studentModal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+        <div class="modal-panel">
+            <!-- Modal Header -->
+            <div class="sticky top-0 bg-gradient-to-r from-[#1e40af] to-[#3b66f5] rounded-t-[1.25rem] px-7 py-5 flex items-center justify-between z-10">
+                <div class="flex items-center gap-3">
+                    <div id="m-avatar" class="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-[14px] ring-2 ring-white/30"></div>
+                    <div>
+                        <h3 id="m-nama" class="text-white text-[17px] font-bold"></h3>
+                        <p id="m-nim" class="text-blue-200 text-[13px]"></p>
+                    </div>
+                </div>
+                <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors cursor-pointer border-0">
+                    <i class="fas fa-times text-sm"></i>
+                </button>
             </div>
-            <div class="pt-10 pb-6 px-6 space-y-5">
-                <div class="flex items-start justify-between"><div><h3 id="m-nama" class="text-[18px] font-bold text-gray-900"></h3><p id="m-nim" class="text-[13px] text-gray-400 mt-0.5"></p></div><span id="m-status" class="mt-1 text-[11px] font-semibold text-green-600 bg-green-50 px-3 py-1.5 rounded-full"></span></div>
-                <div class="border-t border-gray-100"></div>
-                <div><p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Informasi Magang</p>
-                    <div class="space-y-3 text-[14px]">
-                        <div class="flex items-start gap-3"><div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><i class="fas fa-building text-blue-500 text-[13px]"></i></div><div><p class="text-[11px] text-gray-400">Perusahaan</p><p id="m-instansi" class="font-semibold text-gray-800"></p></div></div>
-                        <div class="flex items-start gap-3"><div class="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><i class="fas fa-map-marker-alt text-red-400 text-[13px]"></i></div><div><p class="text-[11px] text-gray-400">Alamat</p><p id="m-alamat" class="font-semibold text-gray-800"></p></div></div>
-                        <div class="flex items-start gap-3"><div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center shrink-0"><i class="fas fa-user-tie text-purple-500 text-[13px]"></i></div><div><p class="text-[11px] text-gray-400">Pembimbing Lapang</p><p id="m-pembimbing" class="font-semibold text-gray-800"></p></div></div>
+
+            <!-- Modal Body -->
+            <div class="p-7 space-y-6">
+
+                <!-- Informasi Pribadi -->
+                <div>
+                    <h4 class="text-[14px] font-bold text-gray-800 flex items-center gap-2 mb-4">
+                        <span class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center"><i class="fas fa-user text-blue-500 text-xs"></i></span>
+                        Informasi Pribadi
+                    </h4>
+                    <div class="grid grid-cols-2 gap-x-6 gap-y-4">
+                        <div><p class="detail-label">Jenis Kelamin</p><p id="m-jk" class="detail-value">-</p></div>
+                        <div><p class="detail-label">Tempat, Tgl Lahir</p><p id="m-ttl" class="detail-value">-</p></div>
+                        <div><p class="detail-label">Agama</p><p id="m-agama" class="detail-value">-</p></div>
+                        <div><p class="detail-label">Golongan Darah</p><p id="m-goldar" class="detail-value">-</p></div>
+                        <div><p class="detail-label">No. HP</p><p id="m-telp" class="detail-value">-</p></div>
+                        <div><p class="detail-label">Email</p><p id="m-email" class="detail-value">-</p></div>
                     </div>
                 </div>
-                <div class="border-t border-gray-100"></div>
-                <div><p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Kontak</p>
-                    <div class="space-y-2.5 text-[14px]">
-                        <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0"><i class="fas fa-phone-alt text-emerald-500 text-[12px]"></i></div><p id="m-telp" class="font-medium text-gray-700"></p></div>
-                        <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0"><i class="fas fa-envelope text-indigo-500 text-[12px]"></i></div><p id="m-email" class="font-medium text-gray-700"></p></div>
+
+                <hr class="border-gray-100">
+
+                <!-- Informasi Magang -->
+                <div>
+                    <h4 class="text-[14px] font-bold text-gray-800 flex items-center gap-2 mb-4">
+                        <span class="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center"><i class="fas fa-building text-purple-500 text-xs"></i></span>
+                        Informasi Magang
+                    </h4>
+                    <div class="grid grid-cols-2 gap-x-6 gap-y-4">
+                        <div><p class="detail-label">Kelompok</p><p id="m-kelompok" class="detail-value">-</p></div>
+                        <div><p class="detail-label">Instansi / Perusahaan</p><p id="m-instansi" class="detail-value">-</p></div>
+                        <div class="col-span-2"><p class="detail-label">Alamat Perusahaan</p><p id="m-alamat" class="detail-value">-</p></div>
+                        <div><p class="detail-label">Pembimbing Lapang</p><p id="m-pembimbing" class="detail-value">-</p></div>
+                        <div><p class="detail-label">Jabatan PL</p><p id="m-jabatanpl" class="detail-value">-</p></div>
                     </div>
                 </div>
-                <div class="border-t border-gray-100"></div>
-                <div><p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Ringkasan Kehadiran</p>
-                    <div class="grid grid-cols-3 gap-3">
-                        <div class="bg-green-50 rounded-2xl p-4 text-center"><p id="m-hadir" class="text-2xl font-bold text-green-600"></p><p class="text-[12px] text-green-500 mt-0.5">Hadir</p></div>
-                        <div class="bg-orange-50 rounded-2xl p-4 text-center"><p id="m-izin" class="text-2xl font-bold text-orange-500"></p><p class="text-[12px] text-orange-400 mt-0.5">Izin</p></div>
-                        <div class="bg-red-50 rounded-2xl p-4 text-center"><p id="m-tidakhadir" class="text-2xl font-bold text-red-500"></p><p class="text-[12px] text-red-400 mt-0.5">Alpha</p></div>
-                    </div>
-                </div>
-                <div class="border-t border-gray-100"></div>
-                <div><p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Catatan Terakhir</p>
-                    <div class="bg-blue-50 rounded-2xl px-4 py-3"><p id="m-catatan" class="text-[14px] text-blue-700 italic leading-relaxed"></p></div>
-                </div>
+
             </div>
         </div>
     </div>
@@ -271,22 +315,28 @@
             const s = students[idx];
             document.getElementById('m-avatar').textContent = s.nama.substring(0,2).toUpperCase();
             document.getElementById('m-nama').textContent = s.nama;
-            document.getElementById('m-nim').textContent = s.nim;
-            document.getElementById('m-status').textContent = s.status;
-            document.getElementById('m-instansi').textContent = s.instansi;
-            document.getElementById('m-alamat').textContent = s.alamat;
-            document.getElementById('m-pembimbing').textContent = s.pembimbing;
-            document.getElementById('m-telp').textContent = s.telp;
-            document.getElementById('m-email').textContent = s.email;
-            document.getElementById('m-hadir').textContent = s.hadir;
-            document.getElementById('m-izin').textContent = s.izin;
-            document.getElementById('m-tidakhadir').textContent = s.tidakHadir;
-            document.getElementById('m-catatan').textContent = s.catatan;
-            document.getElementById('studentModal').classList.remove('hidden');
+            document.getElementById('m-nim').textContent = s.nim || 'NIM belum diisi';
+
+            // Informasi Pribadi
+            document.getElementById('m-jk').textContent = s.jenis_kelamin || '-';
+            const tgl = s.tanggal_lahir ? new Date(s.tanggal_lahir).toLocaleDateString('id-ID', {day:'numeric',month:'long',year:'numeric'}) : '-';
+            document.getElementById('m-ttl').textContent = (s.tempat_lahir || '-') + ', ' + tgl;
+            document.getElementById('m-agama').textContent = s.agama || '-';
+            document.getElementById('m-goldar').textContent = s.golongan_darah || '-';
+            document.getElementById('m-telp').textContent = s.telp || '-';
+            document.getElementById('m-email').textContent = s.email || '-';
+
+            // Informasi Magang
+            document.getElementById('m-kelompok').textContent = s.nama_kelompok || '-';
+            document.getElementById('m-instansi').textContent = s.instansi || '-';
+            document.getElementById('m-alamat').textContent = s.alamat || '-';
+            document.getElementById('m-pembimbing').textContent = s.pembimbing || '-';
+            document.getElementById('m-jabatanpl').textContent = s.jabatan_pl || '-';
+
+            document.getElementById('studentModal').classList.add('active');
             document.body.style.overflow = 'hidden';
         }
-        function closeModal() { document.getElementById('studentModal').classList.add('hidden'); document.body.style.overflow = ''; }
-        function closeModalOnBackdrop(e) { if (e.target === document.getElementById('studentModal')) closeModal(); }
+        function closeModal() { document.getElementById('studentModal').classList.remove('active'); document.body.style.overflow = ''; }
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
         document.getElementById('searchMhs').addEventListener('input', function () {
             const q = this.value.toLowerCase();

@@ -92,7 +92,12 @@
 
     // Mahasiswa bimbingan list with stats
     $stmt = $conn->prepare("
-        SELECT m.id, m.nama, m.no_ktm, c.nama_perusahaan,
+        SELECT m.id, m.nama, m.no_ktm, m.jenis_kelamin, m.tempat_lahir, m.tanggal_lahir,
+               m.no_hp, m.agama, m.status as mhs_status, m.alamat_asal, m.alamat_jember, m.golongan_darah,
+               u.email as email_mhs,
+               c.nama_perusahaan, c.alamat_perusahaan,
+               g.name as nama_kelompok,
+               pl.nama as nama_pembimbing_lapang, pl.jabatan as jabatan_pl, pl.no_hp as hp_pl,
                (SELECT COUNT(*) FROM logbooks lb WHERE lb.mahasiswa_id = m.id) as total_jurnal,
                (SELECT COUNT(*) FROM attendances a WHERE a.mahasiswa_id = m.id AND a.status = 'Hadir') as total_hadir,
                (SELECT COUNT(*) FROM attendances a WHERE a.mahasiswa_id = m.id) as total_absen,
@@ -100,6 +105,8 @@
         FROM mahasiswa m
         JOIN `groups` g ON m.group_id = g.id
         LEFT JOIN companies c ON g.company_id = c.id
+        LEFT JOIN pembimbing_lapang pl ON g.pembimbing_lapang_id = pl.id
+        LEFT JOIN users u ON m.user_id = u.id
         WHERE g.dosen_pembimbing_id = :did
         ORDER BY m.nama ASC
     ");
@@ -131,6 +138,30 @@
         .student-row:hover {
             background-color: #f9fafb;
         }
+        /* Detail Modal */
+        .modal-overlay {
+            position: fixed; inset: 0; z-index: 50;
+            background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-panel {
+            background: #fff; border-radius: 1.25rem; width: 95%; max-width: 620px;
+            max-height: 85vh; overflow-y: auto;
+            box-shadow: 0 25px 60px -12px rgba(0,0,0,0.25);
+            transform: translateY(20px) scale(0.97);
+            transition: transform 0.3s cubic-bezier(.22,1,.36,1);
+        }
+        .modal-overlay.active .modal-panel {
+            transform: translateY(0) scale(1);
+        }
+        .modal-panel::-webkit-scrollbar { width: 6px; }
+        .modal-panel::-webkit-scrollbar-track { background: transparent; }
+        .modal-panel::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+        .detail-label { font-size: 12px; color: #9ca3af; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+        .detail-value { font-size: 14px; color: #1f2937; font-weight: 500; margin-top: 2px; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-gray-800">
@@ -336,7 +367,7 @@
                                         </span>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <a href="mhs_bimbingan.php?detail=<?= $s['id'] ?>" class="text-blue-600 hover:text-blue-800 text-[13px] font-medium hover:underline">Detail</a>
+                                        <button onclick='showDetailModal(<?= json_encode($s, JSON_HEX_APOS | JSON_HEX_TAG) ?>)' class="text-blue-600 hover:text-blue-800 text-[13px] font-medium hover:underline cursor-pointer bg-transparent border-0">Detail</button>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -352,8 +383,97 @@
         <?php include '../includes/footer.php'; ?>
     </div>
 
+    <!-- Detail Modal -->
+    <div id="detailModal" class="modal-overlay" onclick="if(event.target===this)closeDetailModal()">
+        <div class="modal-panel">
+            <!-- Modal Header -->
+            <div class="sticky top-0 bg-gradient-to-r from-[#1e40af] to-[#3b66f5] rounded-t-[1.25rem] px-7 py-5 flex items-center justify-between z-10">
+                <div class="flex items-center gap-3">
+                    <div id="modalAvatar" class="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-[14px] ring-2 ring-white/30"></div>
+                    <div>
+                        <h3 id="modalNama" class="text-white text-[17px] font-bold"></h3>
+                        <p id="modalNim" class="text-blue-200 text-[13px]"></p>
+                    </div>
+                </div>
+                <button onclick="closeDetailModal()" class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors cursor-pointer border-0">
+                    <i class="fas fa-times text-sm"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-7 space-y-6">
+
+                <!-- Informasi Pribadi -->
+                <div>
+                    <h4 class="text-[14px] font-bold text-gray-800 flex items-center gap-2 mb-4">
+                        <span class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center"><i class="fas fa-user text-blue-500 text-xs"></i></span>
+                        Informasi Pribadi
+                    </h4>
+                    <div class="grid grid-cols-2 gap-x-6 gap-y-4">
+                        <div><p class="detail-label">Jenis Kelamin</p><p id="mdJk" class="detail-value">-</p></div>
+                        <div><p class="detail-label">Tempat, Tgl Lahir</p><p id="mdTtl" class="detail-value">-</p></div>
+                        <div><p class="detail-label">Agama</p><p id="mdAgama" class="detail-value">-</p></div>
+                        <div><p class="detail-label">Golongan Darah</p><p id="mdGoldar" class="detail-value">-</p></div>
+                        <div><p class="detail-label">No. HP</p><p id="mdHp" class="detail-value">-</p></div>
+                        <div><p class="detail-label">Email</p><p id="mdEmail" class="detail-value">-</p></div>
+                    </div>
+                </div>
+
+                <hr class="border-gray-100">
+
+                <!-- Informasi Magang -->
+                <div>
+                    <h4 class="text-[14px] font-bold text-gray-800 flex items-center gap-2 mb-4">
+                        <span class="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center"><i class="fas fa-building text-purple-500 text-xs"></i></span>
+                        Informasi Magang
+                    </h4>
+                    <div class="grid grid-cols-2 gap-x-6 gap-y-4">
+                        <div><p class="detail-label">Kelompok</p><p id="mdKelompok" class="detail-value">-</p></div>
+                        <div><p class="detail-label">Instansi / Perusahaan</p><p id="mdPerusahaan" class="detail-value">-</p></div>
+                        <div class="col-span-2"><p class="detail-label">Alamat Perusahaan</p><p id="mdAlamatPerusahaan" class="detail-value">-</p></div>
+                        <div><p class="detail-label">Pembimbing Lapang</p><p id="mdPl" class="detail-value">-</p></div>
+                        <div><p class="detail-label">Jabatan PL</p><p id="mdPlJabatan" class="detail-value">-</p></div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
     <!-- Chart Scripts -->
     <script>
+        // ===== Detail Modal Logic =====
+        function showDetailModal(s) {
+            document.getElementById('modalAvatar').textContent = s.nama.substring(0,2).toUpperCase();
+            document.getElementById('modalNama').textContent = s.nama;
+            document.getElementById('modalNim').textContent = s.no_ktm || 'NIM belum diisi';
+
+            // Informasi Pribadi
+            document.getElementById('mdJk').textContent = s.jenis_kelamin || '-';
+            const tgl = s.tanggal_lahir ? new Date(s.tanggal_lahir).toLocaleDateString('id-ID', {day:'numeric',month:'long',year:'numeric'}) : '-';
+            document.getElementById('mdTtl').textContent = (s.tempat_lahir || '-') + ', ' + tgl;
+            document.getElementById('mdAgama').textContent = s.agama || '-';
+            document.getElementById('mdGoldar').textContent = s.golongan_darah || '-';
+            document.getElementById('mdHp').textContent = s.no_hp || '-';
+            document.getElementById('mdEmail').textContent = s.email_mhs || '-';
+
+            // Informasi Magang
+            document.getElementById('mdKelompok').textContent = s.nama_kelompok || '-';
+            document.getElementById('mdPerusahaan').textContent = s.nama_perusahaan || '-';
+            document.getElementById('mdAlamatPerusahaan').textContent = s.alamat_perusahaan || '-';
+            document.getElementById('mdPl').textContent = s.nama_pembimbing_lapang || '-';
+            document.getElementById('mdPlJabatan').textContent = s.jabatan_pl || '-';
+
+            document.getElementById('detailModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+        document.addEventListener('keydown', e => { if(e.key === 'Escape') closeDetailModal(); });
+
         const jurnalMasukData = <?= json_encode(array_values($jurnalMasukData)) ?>;
         const jurnalReviewData = <?= json_encode(array_values($jurnalReviewData)) ?>;
         const penilaianData = { dinilai: <?= $sudahDinilai ?>, belum: <?= $belumDinilai ?> };
