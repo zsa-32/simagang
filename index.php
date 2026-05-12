@@ -227,6 +227,13 @@
 
         function showToast(type, message, duration = 3000) {
             const container = document.getElementById('toast-container');
+
+            // Hapus semua toast aktif sebelum membuat yang baru (anti-spam)
+            container.querySelectorAll('.toast-alert').forEach(existing => {
+                clearTimeout(existing._timer);
+                existing.remove();
+            });
+
             const meta = TOAST_ICONS[type] || TOAST_ICONS.danger;
 
             const el = document.createElement('div');
