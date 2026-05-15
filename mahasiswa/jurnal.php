@@ -37,6 +37,29 @@
     $stmt->execute();
     $logbooks = $stmt->fetchAll();
 
+    // Fetch feedbacks for each logbook
+    $feedbacksByLogbook = [];
+    if (!empty($logbooks)) {
+        $lbIds = array_column($logbooks, 'id');
+        $inPlaceholders = implode(',', array_fill(0, count($lbIds), '?'));
+        $fbStmt = $conn->prepare("
+            SELECT fl.logbook_id, fl.feedback, fl.created_at, u.name as reviewer_name
+            FROM feedback_logbooks fl
+            LEFT JOIN users u ON fl.penilai_user_id = u.id
+            WHERE fl.logbook_id IN ($inPlaceholders)
+            ORDER BY fl.created_at ASC
+        ");
+        $fbStmt->execute($lbIds);
+        $allFeedbacks = $fbStmt->fetchAll();
+        foreach ($allFeedbacks as $fb) {
+            $feedbacksByLogbook[$fb['logbook_id']][] = [
+                'feedback' => $fb['feedback'],
+                'reviewer' => $fb['reviewer_name'] ?? 'Pembimbing',
+                'date' => date('d M Y H:i', strtotime($fb['created_at'])),
+            ];
+        }
+    }
+
     // Handle delete
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
         $delId = (int)$_POST['delete_id'];
@@ -166,7 +189,7 @@
                                     <td class="px-8 py-5 text-center">
                                         <div class="flex items-center justify-center gap-2">
                                             <button title="Lihat Detail"
-                                                    onclick='previewJurnal(<?= json_encode(['id'=>$lb['id'],'tanggal'=>date('d M Y',$tgl),'kegiatan'=>$lb['kegiatan'],'hasil'=>$lb['hasil'],'dokumentasi'=>$lb['dokumentasi'],'status'=>$statusLabel], JSON_UNESCAPED_UNICODE) ?>)'
+                                                    onclick='previewJurnal(<?= json_encode(['id'=>$lb['id'],'tanggal'=>date('d M Y',$tgl),'kegiatan'=>$lb['kegiatan'],'hasil'=>$lb['hasil'],'dokumentasi'=>$lb['dokumentasi'],'status'=>$statusLabel,'feedbacks'=>$feedbacksByLogbook[$lb['id']] ?? []], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'
                                                     class="text-blue-600 hover:text-blue-800 bg-blue-50/50 hover:bg-blue-100 border border-blue-100 p-2.5 rounded-[8px] transition-all">
                                                 <i class="fas fa-eye text-[14px]"></i>
                                             </button>
@@ -262,6 +285,11 @@
                         </a>
                     </div>
                 </div>
+                <!-- Feedback Section -->
+                <div id="pv-feedback-wrap" class="hidden">
+                    <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Feedback Pembimbing</p>
+                    <div id="pv-feedback-list" class="space-y-2.5"></div>
+                </div>
             </div>
         </div>
         <div class="px-6 py-4 border-t border-gray-100 flex justify-end">
@@ -309,6 +337,27 @@
         } else {
             dokWrap.classList.add('hidden');
         }
+
+        // Render feedbacks
+        const fbWrap = document.getElementById('pv-feedback-wrap');
+        const fbList = document.getElementById('pv-feedback-list');
+        fbList.innerHTML = '';
+        if (j.feedbacks && j.feedbacks.length > 0) {
+            j.feedbacks.forEach(function(fb) {
+                const div = document.createElement('div');
+                div.className = 'bg-blue-50 border border-blue-100 rounded-xl px-4 py-3';
+                div.innerHTML = `<div class="flex items-center justify-between mb-1">
+                    <p class="text-[12px] font-semibold text-blue-700"><i class="fas fa-user-tie mr-1"></i>${fb.reviewer}</p>
+                    <p class="text-[11px] text-gray-400">${fb.date}</p>
+                </div>
+                <p class="text-[13px] text-gray-700 leading-relaxed">${fb.feedback}</p>`;
+                fbList.appendChild(div);
+            });
+            fbWrap.classList.remove('hidden');
+        } else {
+            fbWrap.classList.add('hidden');
+        }
+
         document.getElementById('modalPreviewJurnal').style.display = 'flex';
         document.body.style.overflow = 'hidden';
     }

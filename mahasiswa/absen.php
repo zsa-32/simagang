@@ -10,10 +10,62 @@
     $userName = $_SESSION['nama'] ?? 'Mahasiswa';
 
     // Get mahasiswa record
-    $stmt = $conn->prepare("SELECT id FROM mahasiswa WHERE user_id = :uid");
+    $stmt = $conn->prepare("SELECT id, created_at FROM mahasiswa WHERE user_id = :uid");
     $stmt->execute(['uid' => $userId]);
     $mhs = $stmt->fetch();
     $mhsId = $mhs ? $mhs['id'] : 0;
+    $mhsCreatedAt = $mhs ? $mhs['created_at'] : null;
+
+    // Batas absen: 09:00, lebih dari itu = Terlambat
+    $batasAbsen = '09:00:00';
+
+    // ====== AUTO-MARK ALPHA ======
+    // Mark past weekdays without attendance as Alpha (skip weekends & days with leave)
+    if ($mhsId && $mhsCreatedAt) {
+        $startDate = max(date('Y-m-d', strtotime($mhsCreatedAt)), date('Y-m-d', strtotime('-30 days')));
+        $yesterday = date('Y-m-d', strtotime('-1 day'));
+
+        if ($startDate <= $yesterday) {
+            // Get all dates that already have attendance
+            $existingStmt = $conn->prepare("SELECT date FROM attendances WHERE mahasiswa_id = :mid AND date BETWEEN :start AND :end");
+            $existingStmt->execute(['mid' => $mhsId, 'start' => $startDate, 'end' => $yesterday]);
+            $existingDates = $existingStmt->fetchAll(PDO::FETCH_COLUMN);
+
+            // Get all dates covered by leave requests
+            $leaveStmt = $conn->prepare("
+                SELECT dari_tanggal, sampai_tanggal FROM leave_requests
+                WHERE mahasiswa_id = :mid AND status IN ('pending', 'approved')
+                AND sampai_tanggal >= :start AND dari_tanggal <= :end
+            ");
+            $leaveStmt->execute(['mid' => $mhsId, 'start' => $startDate, 'end' => $yesterday]);
+            $leaveRanges = $leaveStmt->fetchAll();
+            $leaveDates = [];
+            foreach ($leaveRanges as $lr) {
+                $d = new DateTime($lr['dari_tanggal']);
+                $e = new DateTime($lr['sampai_tanggal']);
+                $e->modify('+1 day');
+                while ($d < $e) {
+                    $leaveDates[] = $d->format('Y-m-d');
+                    $d->modify('+1 day');
+                }
+            }
+
+            // Insert Alpha for missing weekdays
+            $alphaStmt = $conn->prepare("INSERT INTO attendances (mahasiswa_id, date, status, created_at) VALUES (:mid, :dt, 'Alpha', NOW())");
+            $current = new DateTime($startDate);
+            $end = new DateTime($yesterday);
+            $end->modify('+1 day');
+            while ($current < $end) {
+                $dateStr = $current->format('Y-m-d');
+                $dayOfWeek = (int)$current->format('N'); // 1=Mon, 7=Sun
+                // Skip weekends (Sat=6, Sun=7)
+                if ($dayOfWeek <= 5 && !in_array($dateStr, $existingDates) && !in_array($dateStr, $leaveDates)) {
+                    $alphaStmt->execute(['mid' => $mhsId, 'dt' => $dateStr]);
+                }
+                $current->modify('+1 day');
+            }
+        }
+    }
 
     // Attendance stats
     $stmt = $conn->prepare("SELECT status, COUNT(*) as total FROM attendances WHERE mahasiswa_id = :mid GROUP BY status");
@@ -22,13 +74,15 @@
 
     $totalAbsen = 0;
     $totalHadir = 0;
+    $totalTerlambat = 0;
     $totalIzinSakit = 0;
     $totalAlpha = 0;
     foreach ($attRows as $r) {
         $total = (int)$r['total'];
         $totalAbsen += $total;
         switch ($r['status']) {
-            case 'Hadir': case 'Terlambat': $totalHadir += $total; break;
+            case 'Hadir': $totalHadir += $total; break;
+            case 'Terlambat': $totalTerlambat += $total; break;
             case 'Izin': case 'Sakit': $totalIzinSakit += $total; break;
             case 'Alpha': $totalAlpha += $total; break;
         }
@@ -51,19 +105,42 @@
     $stmt->execute(['mid' => $mhsId]);
     $alreadyCheckedIn = $stmt->fetch() ? true : false;
 
+    // Check if student has a leave request (pending/approved) covering today
+    $stmt = $conn->prepare("
+        SELECT id, kategori, status FROM leave_requests
+        WHERE mahasiswa_id = :mid AND status IN ('pending', 'approved')
+        AND dari_tanggal <= CURDATE() AND sampai_tanggal >= CURDATE()
+        LIMIT 1
+    ");
+    $stmt->execute(['mid' => $mhsId]);
+    $todayLeave = $stmt->fetch();
+    $hasLeaveToday = $todayLeave ? true : false;
+
     // Handle check-in
     $message = '';
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'checkin') {
-        if ($alreadyCheckedIn) {
+        if ($hasLeaveToday) {
+            $message = 'Anda tidak bisa absen karena sudah mengajukan izin untuk hari ini.';
+        } elseif ($alreadyCheckedIn) {
             $message = 'Anda sudah absen hari ini.';
         } else {
-            $stmt = $conn->prepare("INSERT INTO attendances (mahasiswa_id, date, checkin_time, status) VALUES (:mid, CURDATE(), CURTIME(), 'Hadir')");
-            $stmt->execute(['mid' => $mhsId]);
-            header("Location: absen.php?success=1");
+            // Determine status based on current time
+            $currentTime = date('H:i:s');
+            $status = ($currentTime <= $batasAbsen) ? 'Hadir' : 'Terlambat';
+            $stmt = $conn->prepare("INSERT INTO attendances (mahasiswa_id, date, checkin_time, status) VALUES (:mid, CURDATE(), CURTIME(), :st)");
+            $stmt->execute(['mid' => $mhsId, 'st' => $status]);
+            $successMsg = ($status === 'Terlambat') ? 'late' : '1';
+            header("Location: absen.php?success=" . $successMsg);
             exit;
         }
     }
-    if (isset($_GET['success'])) $message = 'Absen berhasil dicatat!';
+    if (isset($_GET['success'])) {
+        if ($_GET['success'] === 'late') {
+            $message = 'Absen dicatat sebagai Terlambat (lewat batas 09:00).';
+        } else {
+            $message = 'Absen berhasil dicatat!';
+        }
+    }
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -117,13 +194,13 @@
                     </div>
                 </div>
 
-                <!-- 4 Status Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- 5 Status Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                     <!-- Total Absensi -->
                     <div class="bg-[#e0e7ff] rounded-xl p-5 flex items-center justify-between">
                         <div>
                             <p class="text-[#3b82f6] text-[13px] font-semibold mb-1">Total Absensi</p>
-                            <h3 class="text-[#1e3a8a] text-2xl font-bold"><?= $totalAbsen ?> Kali</h3>
+                            <h3 class="text-[#1e3a8a] text-2xl font-bold"><?= $totalAbsen ?></h3>
                         </div>
                         <div class="w-10 h-10 bg-[#bfdbfe] rounded-lg flex items-center justify-center text-[#2563eb]">
                             <i class="fas fa-map-marker-alt"></i>
@@ -133,19 +210,30 @@
                     <!-- Total Hadir -->
                     <div class="bg-[#d1fae5] rounded-xl p-5 flex items-center justify-between">
                         <div>
-                            <p class="text-[#10b981] text-[13px] font-semibold mb-1">Total Hadir</p>
-                            <h3 class="text-[#064e3b] text-2xl font-bold"><?= $totalHadir ?> Kali</h3>
+                            <p class="text-[#10b981] text-[13px] font-semibold mb-1">Hadir</p>
+                            <h3 class="text-[#064e3b] text-2xl font-bold"><?= $totalHadir ?></h3>
                         </div>
                         <div class="w-10 h-10 bg-[#a7f3d0] rounded-lg flex items-center justify-center text-[#059669]">
-                            <i class="fas fa-user"></i>
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                    </div>
+
+                    <!-- Total Terlambat -->
+                    <div class="bg-[#fef9c3] rounded-xl p-5 flex items-center justify-between">
+                        <div>
+                            <p class="text-[#ca8a04] text-[13px] font-semibold mb-1">Terlambat</p>
+                            <h3 class="text-[#713f12] text-2xl font-bold"><?= $totalTerlambat ?></h3>
+                        </div>
+                        <div class="w-10 h-10 bg-[#fde68a] rounded-lg flex items-center justify-center text-[#d97706]">
+                            <i class="fas fa-clock"></i>
                         </div>
                     </div>
 
                     <!-- Total Izin & Sakit -->
                     <div class="bg-[#ffedd5] rounded-xl p-5 flex items-center justify-between">
                         <div>
-                            <p class="text-[#f97316] text-[13px] font-semibold mb-1">Total Izin & Sakit</p>
-                            <h3 class="text-[#7c2d12] text-2xl font-bold"><?= $totalIzinSakit ?> Kali</h3>
+                            <p class="text-[#f97316] text-[13px] font-semibold mb-1">Izin & Sakit</p>
+                            <h3 class="text-[#7c2d12] text-2xl font-bold"><?= $totalIzinSakit ?></h3>
                         </div>
                         <div class="w-10 h-10 bg-[#fed7aa] rounded-lg flex items-center justify-center text-[#ea580c]">
                             <i class="fas fa-envelope"></i>
@@ -155,8 +243,8 @@
                     <!-- Total Alpha -->
                     <div class="bg-[#ffe4e6] rounded-xl p-5 flex items-center justify-between">
                         <div>
-                            <p class="text-[#e11d48] text-[13px] font-semibold mb-1">Total Alpha</p>
-                            <h3 class="text-[#881337] text-2xl font-bold"><?= $totalAlpha ?> Kali</h3>
+                            <p class="text-[#e11d48] text-[13px] font-semibold mb-1">Alpha</p>
+                            <h3 class="text-[#881337] text-2xl font-bold"><?= $totalAlpha ?></h3>
                         </div>
                         <div class="w-10 h-10 bg-[#fecdd3] rounded-lg flex items-center justify-center text-[#be123c]">
                             <i class="fas fa-times"></i>
@@ -166,7 +254,11 @@
 
                 <!-- Action Buttons -->
                 <div class="flex items-center justify-end gap-3 pt-2">
-                    <?php if (!$alreadyCheckedIn): ?>
+                    <?php if ($hasLeaveToday): ?>
+                    <span class="bg-orange-50 text-orange-600 border border-orange-200 px-6 py-2 rounded-md font-medium text-[14px] flex items-center gap-2">
+                        <i class="fas fa-file-signature text-[13px]"></i> Anda Sudah Izin Hari Ini
+                    </span>
+                    <?php elseif (!$alreadyCheckedIn): ?>
                     <form method="POST" style="display:inline">
                         <input type="hidden" name="action" value="checkin">
                         <button type="submit" class="bg-[#10b981] hover:bg-[#059669] text-white px-6 py-2 rounded-md font-medium text-[14px] transition-colors shadow-sm">
@@ -178,10 +270,12 @@
                         <i class="fas fa-check mr-1"></i> Sudah Absen Hari Ini
                     </span>
                     <?php endif; ?>
+                    <?php if (!$hasLeaveToday): ?>
                     <a href="ijinabsen.php"
                        class="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-5 py-2 rounded-md font-medium text-[14px] transition-colors shadow-sm flex items-center gap-2">
                         <i class="fas fa-plus text-[12px]"></i> Buat Izin
                     </a>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Table Container -->

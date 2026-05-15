@@ -217,6 +217,14 @@
                 <div><p class="text-[11px] font-semibold text-gray-400 mb-1">Kegiatan</p><p id="d-kegiatan" class="text-[14px] text-gray-700 leading-relaxed"></p></div>
                 <div><p class="text-[11px] font-semibold text-gray-400 mb-1">Hasil</p><p id="d-hasil" class="text-[14px] text-gray-600 leading-relaxed"></p></div>
 
+                <!-- Dokumentasi Image -->
+                <div id="d-dokumentasi-wrapper" style="display:none;">
+                    <p class="text-[11px] font-semibold text-gray-400 mb-2">Dokumentasi</p>
+                    <a id="d-dokumentasi-link" href="#" target="_blank">
+                        <img id="d-dokumentasi" src="" alt="Dokumentasi Jurnal" class="w-full max-h-[300px] object-contain rounded-xl border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-90 transition-opacity">
+                    </a>
+                </div>
+
                 <form method="POST" id="d-form">
                     <input type="hidden" name="logbook_id" id="d-id">
                     <input type="hidden" name="action_type" id="d-action-type">
@@ -249,6 +257,21 @@
             const statusMap = { approved: ['Disetujui','bg-green-100 text-green-700'], rejected: ['Revisi','bg-red-100 text-red-600'], pending: ['Menunggu','bg-orange-100 text-orange-600'] };
             const [label, cls] = statusMap[j.status] || statusMap.pending;
             document.getElementById('d-status').innerHTML = `<span class="px-3 py-1 rounded-full text-[12px] font-semibold ${cls}">${label}</span>`;
+
+            // Show dokumentasi image if available
+            const dokWrapper = document.getElementById('d-dokumentasi-wrapper');
+            const dokImg = document.getElementById('d-dokumentasi');
+            const dokLink = document.getElementById('d-dokumentasi-link');
+            if (j.dokumentasi) {
+                const imgSrc = '../' + j.dokumentasi;
+                dokImg.src = imgSrc;
+                dokLink.href = imgSrc;
+                dokWrapper.style.display = 'block';
+            } else {
+                dokImg.src = '';
+                dokLink.href = '#';
+                dokWrapper.style.display = 'none';
+            }
 
             // Hide approve/reject buttons if already processed
             document.getElementById('d-actions').style.display = j.status === 'pending' ? 'flex' : 'none';

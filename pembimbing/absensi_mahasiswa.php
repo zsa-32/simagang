@@ -57,15 +57,22 @@ foreach ($mhsList as $m) {
     $rows = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
     $summary[$m['id']] = [
         'nama'   => $m['nama'],
-        'hadir'  => (int)($rows['hadir']  ?? 0),
-        'telat'  => (int)($rows['telat']  ?? 0),
-        'izin'   => (int)($rows['izin']   ?? 0),
-        'alpha'  => (int)($rows['alpha']  ?? 0),
+        'hadir'  => (int)($rows['Hadir']     ?? 0),
+        'telat'  => (int)($rows['Terlambat'] ?? 0),
+        'izin'   => (int)($rows['Izin']      ?? 0),
+        'sakit'  => (int)($rows['Sakit']     ?? 0),
+        'alpha'  => (int)($rows['Alpha']     ?? 0),
     ];
 }
 
 $userName = $_SESSION['nama'] ?? 'Pembimbing';
-$statusColor = ['hadir'=>'green','telat'=>'yellow','izin'=>'blue','alpha'=>'red'];
+$statusColor = [
+    'Hadir'     => 'green',
+    'Terlambat' => 'yellow',
+    'Izin'      => 'blue',
+    'Sakit'     => 'orange',
+    'Alpha'     => 'red',
+];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -114,33 +121,6 @@ $statusColor = ['hadir'=>'green','telat'=>'yellow','izin'=>'blue','alpha'=>'red'
                 </button>
             </form>
 
-            <!-- Summary Cards -->
-            <?php if (!empty($summary)): ?>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <?php
-                $totalHadir = array_sum(array_column($summary, 'hadir'));
-                $totalTelat = array_sum(array_column($summary, 'telat'));
-                $totalIzin  = array_sum(array_column($summary, 'izin'));
-                $totalAlpha = array_sum(array_column($summary, 'alpha'));
-                ?>
-                <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-center">
-                    <p class="text-2xl font-bold text-green-600"><?= $totalHadir ?></p>
-                    <p class="text-xs text-gray-500 mt-0.5">Total Hadir</p>
-                </div>
-                <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-center">
-                    <p class="text-2xl font-bold text-yellow-500"><?= $totalTelat ?></p>
-                    <p class="text-xs text-gray-500 mt-0.5">Total Telat</p>
-                </div>
-                <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-center">
-                    <p class="text-2xl font-bold text-blue-600"><?= $totalIzin ?></p>
-                    <p class="text-xs text-gray-500 mt-0.5">Total Izin</p>
-                </div>
-                <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-center">
-                    <p class="text-2xl font-bold text-red-500"><?= $totalAlpha ?></p>
-                    <p class="text-xs text-gray-500 mt-0.5">Total Alpha</p>
-                </div>
-            </div>
-            <?php endif; ?>
 
             <!-- Summary Per Mahasiswa -->
             <?php if (!empty($summary) && !$filterMhsId): ?>
@@ -154,7 +134,8 @@ $statusColor = ['hadir'=>'green','telat'=>'yellow','izin'=>'blue','alpha'=>'red'
                             <tr>
                                 <th class="px-6 py-3 text-left">Nama</th>
                                 <th class="px-6 py-3 text-center">Hadir</th>
-                                <th class="px-6 py-3 text-center">Telat</th>
+                                <th class="px-6 py-3 text-center">Terlambat</th>
+                                <th class="px-6 py-3 text-center">Sakit</th>
                                 <th class="px-6 py-3 text-center">Izin</th>
                                 <th class="px-6 py-3 text-center">Alpha</th>
                                 <th class="px-6 py-3 text-center">Total</th>
@@ -166,9 +147,10 @@ $statusColor = ['hadir'=>'green','telat'=>'yellow','izin'=>'blue','alpha'=>'red'
                                 <td class="px-6 py-3 font-medium text-gray-800"><?= htmlspecialchars($s['nama']) ?></td>
                                 <td class="px-6 py-3 text-center"><span class="text-green-600 font-bold"><?= $s['hadir'] ?></span></td>
                                 <td class="px-6 py-3 text-center"><span class="text-yellow-500 font-bold"><?= $s['telat'] ?></span></td>
+                                <td class="px-6 py-3 text-center"><span class="text-orange-500 font-bold"><?= $s['sakit'] ?></span></td>
                                 <td class="px-6 py-3 text-center"><span class="text-blue-600 font-bold"><?= $s['izin'] ?></span></td>
                                 <td class="px-6 py-3 text-center"><span class="text-red-500 font-bold"><?= $s['alpha'] ?></span></td>
-                                <td class="px-6 py-3 text-center text-gray-600"><?= $s['hadir']+$s['telat']+$s['izin']+$s['alpha'] ?></td>
+                                <td class="px-6 py-3 text-center text-gray-600"><?= $s['hadir']+$s['telat']+$s['sakit']+$s['izin']+$s['alpha'] ?></td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -207,6 +189,7 @@ $statusColor = ['hadir'=>'green','telat'=>'yellow','izin'=>'blue','alpha'=>'red'
                                     <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold
                                         <?= $sc==='green' ?'bg-green-100 text-green-700' :'' ?>
                                         <?= $sc==='yellow'?'bg-yellow-100 text-yellow-700':'' ?>
+                                        <?= $sc==='orange'?'bg-orange-100 text-orange-700':'' ?>
                                         <?= $sc==='blue'  ?'bg-blue-100 text-blue-700'   :'' ?>
                                         <?= $sc==='red'   ?'bg-red-100 text-red-700'     :'' ?>
                                         <?= $sc==='gray'  ?'bg-gray-100 text-gray-600'   :'' ?>">

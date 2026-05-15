@@ -97,9 +97,11 @@ $statusBadge = ['pending'=>'yellow','disetujui'=>'green','ditolak'=>'red'];
             </div>
 
             <?php if ($msg): ?>
-            <div class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium <?= $msgType === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200' ?>">
-                <i class="fas fa-circle-check"></i> <?= htmlspecialchars($msg) ?>
-            </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    showNotifModal('<?= $msgType === 'success' ? 'success' : 'error' ?>', '<?= addslashes($msg) ?>');
+                });
+            </script>
             <?php endif; ?>
 
             <!-- Filter -->
@@ -108,6 +110,7 @@ $statusBadge = ['pending'=>'yellow','disetujui'=>'green','ditolak'=>'red'];
                     <label class="block text-xs font-semibold text-gray-600 mb-1">Mahasiswa</label>
                     <select name="mhs_id" class="border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                         <option value="">Semua Mahasiswa</option>
+
                         <?php foreach ($mhsList as $m): ?>
                         <option value="<?= $m['id'] ?>" <?= $filterMhsId == $m['id'] ? 'selected' : '' ?>><?= htmlspecialchars($m['nama']) ?></option>
                         <?php endforeach; ?>
@@ -190,13 +193,15 @@ $statusBadge = ['pending'=>'yellow','disetujui'=>'green','ditolak'=>'red'];
 
                         <!-- Form Feedback -->
                         <div class="border-t border-gray-100 pt-4">
-                            <form method="POST" class="flex gap-3">
+                            <form method="POST" class="flex flex-col gap-2" onsubmit="return validateFeedback(this)">
                                 <input type="hidden" name="logbook_id" value="<?= $j['id'] ?>">
-                                <textarea name="feedback" rows="2" placeholder="Tulis feedback untuk jurnal ini..."
-                                          class="flex-1 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
-                                <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors self-end whitespace-nowrap">
-                                    <i class="fas fa-paper-plane mr-1"></i> Kirim
-                                </button>
+                                <div class="flex gap-3">
+                                    <textarea name="feedback" rows="2" required placeholder="Tulis feedback untuk jurnal ini..."
+                                              class="flex-1 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors self-end whitespace-nowrap">
+                                        <i class="fas fa-paper-plane mr-1"></i> Kirim
+                                    </button>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -208,5 +213,69 @@ $statusBadge = ['pending'=>'yellow','disetujui'=>'green','ditolak'=>'red'];
     </main>
     <?php include '../includes/footer.php'; ?>
 </div>
+
+<!-- Notification Modal -->
+<div id="notifModal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeNotifModal()">
+    <div id="notifBox" class="bg-white rounded-2xl w-full max-w-[400px] shadow-2xl overflow-hidden" style="transition: transform 0.3s cubic-bezier(.34,1.56,.64,1), opacity 0.25s ease;">
+        <div class="p-8 text-center">
+            <div id="notifIcon" class="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"></div>
+            <h3 id="notifTitle" class="text-[18px] font-bold text-gray-900 mb-2"></h3>
+            <p id="notifMessage" class="text-[14px] text-gray-500 leading-relaxed"></p>
+        </div>
+        <div class="px-8 pb-6 flex justify-center">
+            <button onclick="closeNotifModal()" class="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[14px] font-semibold transition-colors shadow-sm">OK</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function showNotifModal(type, message) {
+    const icon = document.getElementById('notifIcon');
+    const title = document.getElementById('notifTitle');
+    const msg = document.getElementById('notifMessage');
+
+    if (type === 'success') {
+        icon.className = 'w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-green-100';
+        icon.innerHTML = '<i class="fas fa-check-circle text-green-500 text-[32px]"></i>';
+        title.textContent = 'Berhasil';
+    } else {
+        icon.className = 'w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-red-100';
+        icon.innerHTML = '<i class="fas fa-exclamation-circle text-red-500 text-[32px]"></i>';
+        title.textContent = 'Perhatian';
+    }
+    msg.textContent = message;
+
+    const modal = document.getElementById('notifModal');
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    // Auto close after 3 seconds
+    setTimeout(() => closeNotifModal(), 3000);
+}
+
+function closeNotifModal() {
+    document.getElementById('notifModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function validateFeedback(form) {
+    const textarea = form.querySelector('textarea[name="feedback"]');
+    if (!textarea.value.trim()) {
+        textarea.classList.add('border-red-400', 'ring-2', 'ring-red-100');
+        textarea.classList.remove('border-gray-200');
+        textarea.focus();
+        showNotifModal('error', 'Feedback tidak boleh kosong. Silakan tulis feedback terlebih dahulu.');
+        setTimeout(() => {
+            textarea.classList.remove('border-red-400', 'ring-2', 'ring-red-100');
+            textarea.classList.add('border-gray-200');
+        }, 3000);
+        return false;
+    }
+    return true;
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNotifModal(); });
+</script>
 </body>
 </html>
+

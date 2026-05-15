@@ -14,7 +14,7 @@
     $message = '';
     $msgType = 'green';
 
-    // Handle form submission
+    // Handle form submission — insert to leave_requests (pending)
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $kategori = $_POST['kategori'] ?? '';
         $dari = $_POST['dari_tanggal'] ?? '';
@@ -24,41 +24,72 @@
         if (!$kategori || !$dari || !$sampai || !$alasan) {
             $message = 'Semua field wajib harus diisi.';
             $msgType = 'red';
+        } elseif (!isset($_FILES['bukti']) || $_FILES['bukti']['error'] !== UPLOAD_ERR_OK) {
+            $message = 'Bukti pendukung wajib diunggah.';
+            $msgType = 'red';
         } else {
-            // Map kategori to attendance status
-            $status = match($kategori) {
-                'sakit' => 'Sakit',
-                default => 'Izin',
-            };
-
-            // Insert attendance records for each date in range
-            $startDate = new DateTime($dari);
-            $endDate = new DateTime($sampai);
-            $endDate->modify('+1 day');
-            $interval = new DateInterval('P1D');
-            $period = new DatePeriod($startDate, $interval, $endDate);
-
-            $insertStmt = $conn->prepare("
-                INSERT INTO attendances (mahasiswa_id, date, status, created_at)
-                VALUES (:mid, :dt, :st, NOW())
-                ON DUPLICATE KEY UPDATE status = :st2
+            // Check for duplicate leave request (overlapping dates)
+            $chkDup = $conn->prepare("
+                SELECT id FROM leave_requests
+                WHERE mahasiswa_id = :mid AND status != 'ditolak'
+                AND dari_tanggal <= :sampai AND sampai_tanggal >= :dari
             ");
+            $chkDup->execute(['mid' => $mhsId, 'dari' => $dari, 'sampai' => $sampai]);
+            if ($chkDup->fetch()) {
+                $message = 'Anda sudah mengajukan izin untuk tanggal tersebut.';
+                $msgType = 'red';
+            } else {
+                // Handle file upload (bukti)
+                $buktiPath = null;
+                $ext = pathinfo($_FILES['bukti']['name'], PATHINFO_EXTENSION);
+                $filename = 'bukti_' . $mhsId . '_' . time() . '.' . $ext;
+                $uploadDir = __DIR__ . '/../uploads/leave_requests/';
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+                move_uploaded_file($_FILES['bukti']['tmp_name'], $uploadDir . $filename);
+                $buktiPath = 'uploads/leave_requests/' . $filename;
 
-            foreach ($period as $date) {
-                $dateStr = $date->format('Y-m-d');
-                // Check if not weekend (optional)
-                $insertStmt->execute([
+                $stmt = $conn->prepare("
+                    INSERT INTO leave_requests (mahasiswa_id, kategori, dari_tanggal, sampai_tanggal, alasan, bukti, status)
+                    VALUES (:mid, :kat, :dari, :sampai, :alasan, :bukti, 'pending')
+                ");
+                $stmt->execute([
                     'mid' => $mhsId,
-                    'dt' => $dateStr,
-                    'st' => $status,
-                    'st2' => $status,
+                    'kat' => $kategori,
+                    'dari' => $dari,
+                    'sampai' => $sampai,
+                    'alasan' => $alasan,
+                    'bukti' => $buktiPath,
                 ]);
-            }
 
-            header("Location: absen.php?izin=1");
-            exit;
+                header("Location: ijinabsen.php?success=1");
+                exit;
+            }
         }
     }
+
+    // Fetch leave request history
+    $stmt = $conn->prepare("
+        SELECT lr.*, u.name as reviewer_name
+        FROM leave_requests lr
+        LEFT JOIN users u ON lr.reviewed_by = u.id
+        WHERE lr.mahasiswa_id = :mid
+        ORDER BY lr.created_at DESC
+        LIMIT 20
+    ");
+    $stmt->execute(['mid' => $mhsId]);
+    $leaveHistory = $stmt->fetchAll();
+
+    if (isset($_GET['success'])) {
+        $message = 'Pengajuan izin berhasil dikirim. Menunggu persetujuan pembimbing.';
+        $msgType = 'green';
+    }
+
+    $kategoriLabel = [
+        'sakit' => 'Sakit',
+        'keperluan_kampus' => 'Keperluan Kampus',
+        'keperluan_keluarga' => 'Keperluan Keluarga',
+        'lainnya' => 'Lainnya',
+    ];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -84,7 +115,7 @@
 
         <?php include '../includes/header.php'; ?>
 
-        <main class="flex-1 overflow-y-auto p-6 md:p-8 bg-white">
+        <main class="flex-1 overflow-y-auto p-6 md:p-8 bg-[#f8f9fa]">
             <div class="max-w-[860px] mx-auto space-y-6">
 
                 <?php if ($message): ?>
@@ -114,7 +145,7 @@
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8">
                     <div class="mb-7">
                         <h3 class="text-[20px] font-bold text-gray-800">Pengajuan Izin Ketidakhadiran</h3>
-                        <p class="text-[14px] text-gray-400 mt-1">Silakan lengkapi form berikut untuk mengajukan izin (Sakit/Keperluan Kampus/Lainnya).</p>
+                        <p class="text-[14px] text-gray-400 mt-1">Silakan lengkapi form berikut untuk mengajukan izin (Sakit/Keperluan Kampus/Lainnya). Status akan menunggu persetujuan pembimbing.</p>
                     </div>
 
                     <form action="" method="POST" enctype="multipart/form-data" id="formIzin">
@@ -167,7 +198,7 @@
 
                         <!-- Bukti Pendukung -->
                         <div class="mb-8">
-                            <label class="block text-[14px] font-semibold text-gray-700 mb-2">Bukti Pendukung</label>
+                            <label class="block text-[14px] font-semibold text-gray-700 mb-2">Bukti Pendukung <span class="text-red-500">*</span></label>
                             <div id="dropzone"
                                  class="dropzone border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/60 p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/20 transition-all"
                                  onclick="document.getElementById('buktInput').click()"
@@ -178,7 +209,7 @@
                                 <p class="text-[14px] text-gray-600 font-medium mb-0.5">Unggah Bukti (Surat Sakit / Bukti Chat Dosen)</p>
                                 <p class="text-[12px] text-gray-400 mb-4">(Maks. 2MB)</p>
                                 <button type="button" class="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-[13px] font-medium px-5 py-2 rounded-lg transition-colors shadow-sm">Pilih File</button>
-                                <input type="file" id="buktInput" name="bukti" class="hidden" accept="image/jpeg,image/png,image/jpg,application/pdf" onchange="onFileSelect(event)">
+                                <input type="file" id="buktInput" name="bukti" required class="hidden" accept="image/jpeg,image/png,image/jpg,application/pdf" onchange="onFileSelect(event)">
                             </div>
                             <div id="filePreview" class="hidden mt-3 p-3 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-between gap-3">
                                 <div class="flex items-center gap-3">
@@ -197,12 +228,72 @@
                         <!-- Action Buttons -->
                         <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
                             <a href="absen.php" class="px-6 py-2.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-medium text-[14px] transition-colors shadow-sm">Batal</a>
-                            <button type="submit" class="px-6 py-2.5 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-xl font-medium text-[14px] transition-colors shadow-sm flex items-center gap-2">
+                            <button type="submit" id="btnSubmitIzin" class="px-6 py-2.5 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-xl font-medium text-[14px] transition-colors shadow-sm flex items-center gap-2">
                                 <i class="fas fa-paper-plane text-[13px]"></i> Ajukan Izin
                             </button>
                         </div>
 
                     </form>
+                </div>
+
+                <!-- Riwayat Pengajuan Izin -->
+                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div class="px-6 py-5 border-b border-gray-100">
+                        <h3 class="text-[17px] font-bold text-gray-800">Riwayat Pengajuan Izin</h3>
+                        <p class="text-[13px] text-gray-400 mt-0.5">Status pengajuan izin Anda</p>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-[14px]">
+                            <thead>
+                                <tr class="bg-gray-50 border-b border-gray-100 text-gray-500 text-[12px] uppercase tracking-wider">
+                                    <th class="px-6 py-4 text-left font-semibold">Kategori</th>
+                                    <th class="px-6 py-4 text-left font-semibold">Tanggal</th>
+                                    <th class="px-6 py-4 text-left font-semibold">Alasan</th>
+                                    <th class="px-6 py-4 text-center font-semibold">Status</th>
+                                    <th class="px-6 py-4 text-left font-semibold">Catatan</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-50">
+                                <?php if (empty($leaveHistory)): ?>
+                                <tr><td colspan="5" class="px-6 py-8 text-center text-gray-400">Belum ada pengajuan izin.</td></tr>
+                                <?php else: ?>
+                                <?php foreach ($leaveHistory as $lr):
+                                    $statusClass = match($lr['status']) {
+                                        'approved' => 'bg-green-100 text-green-700',
+                                        'ditolak' => 'bg-red-100 text-red-600',
+                                        default => 'bg-yellow-100 text-yellow-700',
+                                    };
+                                    $statusLabel = match($lr['status']) {
+                                        'approved' => 'Disetujui',
+                                        'ditolak' => 'Ditolak',
+                                        default => 'Menunggu',
+                                    };
+                                ?>
+                                <tr class="hover:bg-gray-50/50 transition-colors">
+                                    <td class="px-6 py-4 font-medium text-gray-800"><?= htmlspecialchars($kategoriLabel[$lr['kategori']] ?? ucfirst($lr['kategori'])) ?></td>
+                                    <td class="px-6 py-4 text-gray-600 whitespace-nowrap">
+                                        <?= date('d M Y', strtotime($lr['dari_tanggal'])) ?>
+                                        <?php if ($lr['dari_tanggal'] !== $lr['sampai_tanggal']): ?>
+                                            — <?= date('d M Y', strtotime($lr['sampai_tanggal'])) ?>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-600 max-w-[200px]"><span class="line-clamp-2"><?= htmlspecialchars($lr['alasan']) ?></span></td>
+                                    <td class="px-6 py-4 text-center">
+                                        <span class="px-2.5 py-1 rounded-full text-[12px] font-semibold <?= $statusClass ?>"><?= $statusLabel ?></span>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-500 text-[13px] max-w-[180px]">
+                                        <?php if ($lr['catatan_reviewer']): ?>
+                                            <span class="line-clamp-2"><?= htmlspecialchars($lr['catatan_reviewer']) ?></span>
+                                        <?php else: ?>
+                                            <span class="text-gray-300">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
             </div>
