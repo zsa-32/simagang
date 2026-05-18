@@ -1,4 +1,5 @@
 <?php
+    date_default_timezone_set('Asia/Jakarta');
     require_once __DIR__ . "/../config/role_guard.php";
     checkRole("mahasiswa");
     require_once __DIR__ . '/../config/db_connect.php';
@@ -119,6 +120,7 @@
 
     // Handle check-in
     $message = '';
+    $showEarlyModal = false;
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'checkin') {
         if ($hasLeaveToday) {
             $message = 'Anda tidak bisa absen karena sudah mengajukan izin untuk hari ini.';
@@ -128,7 +130,7 @@
             // Determine status based on current time
             $currentTime = date('H:i:s');
             if ($currentTime < $absenBuka) {
-                $message = 'Absen belum dibuka. Absen dibuka mulai pukul 06:00.';
+                $showEarlyModal = true;
             } else {
                 $status = ($currentTime <= $absenTutup) ? 'Hadir' : 'Terlambat';
                 $stmt = $conn->prepare("INSERT INTO attendances (mahasiswa_id, date, checkin_time, status) VALUES (:mid, CURDATE(), CURTIME(), :st)");
@@ -328,6 +330,28 @@
         </main>
         <?php include '../includes/footer.php'; ?>
     </div>
+
+    <!-- Modal Absen Belum Dibuka -->
+    <?php if ($showEarlyModal): ?>
+    <div id="earlyModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center animate-[fadeIn_0.3s_ease]">
+            <div class="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-clock text-orange-500 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-bold text-gray-800 mb-2">Absen Belum Dibuka</h3>
+            <p class="text-gray-500 text-sm mb-6">Absen dibuka mulai pukul <span class="font-semibold text-gray-700">06:00 WIB</span> sampai <span class="font-semibold text-gray-700">08:00 WIB</span>.</p>
+            <button onclick="document.getElementById('earlyModal').style.display='none'" class="bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-8 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm">
+                Mengerti
+            </button>
+        </div>
+    </div>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+    <?php endif; ?>
 
 </body>
 </html>
