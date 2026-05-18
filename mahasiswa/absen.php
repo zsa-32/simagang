@@ -16,8 +16,9 @@
     $mhsId = $mhs ? $mhs['id'] : 0;
     $mhsCreatedAt = $mhs ? $mhs['created_at'] : null;
 
-    // Batas absen: 09:00, lebih dari itu = Terlambat
-    $batasAbsen = '09:00:00';
+    // Batas absen: 06:00 - 08:00, sebelum 06:00 belum bisa, lewat 08:00 = Terlambat
+    $absenBuka = '06:00:00';
+    $absenTutup = '08:00:00';
 
     // ====== AUTO-MARK ALPHA ======
     // Mark past weekdays without attendance as Alpha (skip weekends & days with leave)
@@ -126,17 +127,21 @@
         } else {
             // Determine status based on current time
             $currentTime = date('H:i:s');
-            $status = ($currentTime <= $batasAbsen) ? 'Hadir' : 'Terlambat';
-            $stmt = $conn->prepare("INSERT INTO attendances (mahasiswa_id, date, checkin_time, status) VALUES (:mid, CURDATE(), CURTIME(), :st)");
-            $stmt->execute(['mid' => $mhsId, 'st' => $status]);
-            $successMsg = ($status === 'Terlambat') ? 'late' : '1';
-            header("Location: absen.php?success=" . $successMsg);
-            exit;
+            if ($currentTime < $absenBuka) {
+                $message = 'Absen belum dibuka. Absen dibuka mulai pukul 06:00.';
+            } else {
+                $status = ($currentTime <= $absenTutup) ? 'Hadir' : 'Terlambat';
+                $stmt = $conn->prepare("INSERT INTO attendances (mahasiswa_id, date, checkin_time, status) VALUES (:mid, CURDATE(), CURTIME(), :st)");
+                $stmt->execute(['mid' => $mhsId, 'st' => $status]);
+                $successMsg = ($status === 'Terlambat') ? 'late' : '1';
+                header("Location: absen.php?success=" . $successMsg);
+                exit;
+            }
         }
     }
     if (isset($_GET['success'])) {
         if ($_GET['success'] === 'late') {
-            $message = 'Absen dicatat sebagai Terlambat (lewat batas 09:00).';
+            $message = 'Absen dicatat sebagai Terlambat (lewat batas 08:00).';
         } else {
             $message = 'Absen berhasil dicatat!';
         }
