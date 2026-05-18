@@ -33,7 +33,6 @@ $menus = [
     ],
     'pembimbing' => [
         ['title' => 'Dashboard',             'icon' => 'fa-th-large',      'url' => 'dashboard.php',              'id' => 'dashboard',            'group' => 'MENU UTAMA'],
-        ['title' => 'Monitoring Mahasiswa',  'icon' => 'fa-user-graduate', 'url' => 'monitoring_mahasiswa.php',   'id' => 'monitoring_mahasiswa', 'group' => 'MENU UTAMA'],
         ['title' => 'Absensi Mahasiswa',     'icon' => 'fa-calendar-check','url' => 'absensi_mahasiswa.php',      'id' => 'absensi_mahasiswa',    'group' => 'MENU UTAMA'],
         ['title' => 'Feedback Jurnal',       'icon' => 'fa-comments',      'url' => 'feedback_jurnal.php',        'id' => 'feedback_jurnal',      'group' => 'MENU UTAMA'],
         ['title' => 'Perizinan',              'icon' => 'fa-file-signature','url' => 'perizinan_mahasiswa.php',    'id' => 'perizinan_mahasiswa',  'group' => 'MENU UTAMA'],
