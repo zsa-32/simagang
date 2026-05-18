@@ -273,8 +273,8 @@
                 dokWrapper.style.display = 'none';
             }
 
-            // Hide approve/reject buttons if already processed
-            document.getElementById('d-actions').style.display = j.status === 'pending' ? 'flex' : 'none';
+            // Always show approve/reject buttons
+            document.getElementById('d-actions').style.display = 'flex';
 
             document.getElementById('detailModal').classList.remove('hidden');
             document.body.style.overflow = 'hidden';
