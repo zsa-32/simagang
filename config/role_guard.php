@@ -20,7 +20,8 @@ if (session_status() === PHP_SESSION_NONE) {
  *
  * @param string|array $allowedRoles Single role name or array of allowed role names
  */
-function showAccessDenied($message, $buttonText, $buttonHref) {
+function showAccessDenied($message, $buttonText, $buttonHref)
+{
     http_response_code(403);
     echo '<!DOCTYPE html>
     <html lang="id">
@@ -77,10 +78,10 @@ function getSessionUser(): ?array
     }
 
     return [
-        'id'        => $_SESSION['id_user'],
-        'name'      => $_SESSION['nama'] ?? '',
-        'email'     => $_SESSION['email'] ?? '',
-        'role_id'   => $_SESSION['role_id'] ?? null,
+        'id' => $_SESSION['id_user'],
+        'name' => $_SESSION['nama'] ?? '',
+        'email' => $_SESSION['email'] ?? '',
+        'role_id' => $_SESSION['role_id'] ?? null,
         'role_name' => $_SESSION['role_name'] ?? '',
     ];
 }

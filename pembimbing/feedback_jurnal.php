@@ -148,13 +148,6 @@ $userName = $_SESSION['nama'] ?? 'Pembimbing';
                     <h2 class="text-[16px] font-bold text-gray-800">Feedback Jurnal Mahasiswa</h2>
                     <p class="text-[13px] text-gray-400 mt-0.5">Review dan berikan feedback jurnal harian mahasiswa magang</p>
                 </div>
-                <div class="flex items-center gap-3">
-                    <div class="relative">
-                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[13px]"></i>
-                        <input type="text" id="searchJurnal" placeholder="Cari mahasiswa atau kegiatan..."
-                               class="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-[13px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 w-64 transition-all">
-                    </div>
-                </div>
             </div>
 
             <!-- Stats -->
