@@ -143,7 +143,7 @@ $adminName = $_SESSION['nama'] ?? 'Admin';
                                 <td class="px-6 py-4 text-gray-600"><?= htmlspecialchars($c['contact_person'] ?: '-') ?></td>
                                 <td class="px-6 py-4 text-gray-600"><?= htmlspecialchars($c['no_hp'] ?: '-') ?></td>
                                 <td class="px-6 py-4 text-center"> 
-                                    <span class="bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full"><?= (int)$c['total_group'] ?> Kelompok</span>
+                                    <span class="bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap"><?= (int)$c['total_group'] ?> Kelompok</span>
                                 </td>
                                 <td class="px-6 py-4 text-center">
                                     <div class="flex items-center justify-center gap-2">
