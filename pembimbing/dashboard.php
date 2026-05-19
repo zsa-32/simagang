@@ -61,12 +61,12 @@ $pendingJurnal = (int)$stmt3->fetchColumn();
                     <p class="text-gray-500 text-sm mt-0.5">Selamat datang, <?= htmlspecialchars($pl['nama'] ?? $_SESSION['nama'] ?? 'Pembimbing') ?> — <?= htmlspecialchars($companyName) ?></p>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                    <a href="monitoring_mahasiswa.php" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col gap-4 hover:shadow-md transition-shadow group">
+                    <a  class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col gap-4 hover:shadow-md transition-shadow group">
                         <div class="flex items-start gap-4">
                             <div class="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform"><i class="fas fa-user-graduate text-white text-xl"></i></div>
                             <div><p class="text-[13px] text-gray-500 font-medium">Total Mahasiswa</p><p class="text-3xl font-bold text-gray-900 mt-0.5"><?= $totalMhs ?></p></div>
                         </div>
-                        <p class="text-[13px] text-blue-600 font-medium">Lihat detail monitoring <i class="fas fa-arrow-right text-[11px] ml-1"></i></p>
+                        <p class="text-[13px] text-blue-600 font-medium">Lihat detail monitoring <i class=" text-[11px] ml-1"></i></p>
                     </a>
                     <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col gap-4 hover:shadow-md transition-shadow">
                         <div class="flex items-start gap-4">

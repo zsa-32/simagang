@@ -180,7 +180,7 @@ $kategoriLabel = [
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center gap-4">
                     <div class="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center shrink-0"><i class="fas fa-clock text-orange-400 text-[20px]"></i></div>
-                    <div><p class="text-[12px] text-gray-500 mb-0.5">Menunggu Review</p><p class="text-3xl font-bold text-gray-900"><?= $statPending ?></p></div>
+                    <div><p class="text-[12px] text-gray-500 mb-0.5">Pending</p><p class="text-3xl font-bold text-gray-900"><?= $statPending ?></p></div>
                 </div>
                 <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center gap-4">
                     <div class="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center shrink-0"><i class="fas fa-check-circle text-green-500 text-[20px]"></i></div>
@@ -236,7 +236,7 @@ $kategoriLabel = [
                                 $statusLabel = match($lr['status']) {
                                     'approved' => 'Disetujui',
                                     'ditolak' => 'Ditolak',
-                                    default => 'Menunggu',
+                                    default => 'Pending',
                                 };
                             ?>
                             <tr class="hover:bg-gray-50/50 transition-colors">
@@ -426,7 +426,7 @@ $kategoriLabel = [
         const statusMap = {
             'approved': ['Disetujui', 'bg-green-100 text-green-700'],
             'ditolak': ['Ditolak', 'bg-red-100 text-red-600'],
-            'pending': ['Menunggu', 'bg-yellow-100 text-yellow-700']
+            'pending': ['Pending', 'bg-yellow-100 text-yellow-700']
         };
         const [label, cls] = statusMap[lr.status] || statusMap.pending;
         document.getElementById('d-status').innerHTML = `<span class="px-3 py-1 rounded-full text-[12px] font-semibold ${cls}">${label}</span>`;
