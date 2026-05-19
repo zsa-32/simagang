@@ -41,19 +41,4 @@
         <textarea name="alamat_perusahaan" rows="2" placeholder="Alamat lengkap perusahaan"
                   class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
     </div>
-    <div>
-        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Latitude</label>
-        <input type="number" step="any" name="latitude" placeholder="-7.9752"
-               class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-    </div>
-    <div>
-        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Longitude</label>
-        <input type="number" step="any" name="longitude" placeholder="113.3669"
-               class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-    </div>
-    <div>
-        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Radius Absensi (meter)</label>
-        <input type="number" name="radius" value="200" min="50" max="1000"
-               class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-    </div>
 </div>
