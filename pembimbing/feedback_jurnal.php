@@ -78,15 +78,31 @@ if (!empty($mhsList)) {
     $jurnal = $stmt->fetchAll();
 }
 
-// Stats
+// Stats — dihitung langsung dari DB (tanpa filter status & tanpa LIMIT)
 $statPending = 0; $statApproved = 0; $statRejected = 0;
-foreach ($jurnal as $j) {
-    match($j['status']) {
-        'pending' => $statPending++,
-        'approved' => $statApproved++,
-        'rejected' => $statRejected++,
-        default => null,
-    };
+if (!empty($mhsList)) {
+    $mhsIdsForStat = array_column($mhsList, 'id');
+    $inQStat = implode(',', array_fill(0, count($mhsIdsForStat), '?'));
+    $paramsStat = $mhsIdsForStat;
+    if ($filterMhsId) { 
+        $inQStat = '?'; 
+        $paramsStat = [$filterMhsId]; 
+    }
+    $stmtStat = $conn->prepare("
+        SELECT status, COUNT(*) as total
+        FROM logbooks
+        WHERE mahasiswa_id IN ($inQStat)
+        GROUP BY status
+    ");
+    $stmtStat->execute($paramsStat);
+    foreach ($stmtStat->fetchAll() as $row) {
+        match($row['status']) {
+            'pending'  => $statPending  = (int)$row['total'],
+            'approved' => $statApproved = (int)$row['total'],
+            'rejected' => $statRejected = (int)$row['total'],
+            default    => null,
+        };
+    }
 }
 
 $userName = $_SESSION['nama'] ?? 'Pembimbing';
@@ -145,7 +161,7 @@ $userName = $_SESSION['nama'] ?? 'Pembimbing';
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center gap-4">
                     <div class="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center shrink-0"><i class="fas fa-comment-dots text-orange-400 text-[20px]"></i></div>
-                    <div><p class="text-[12px] text-gray-500 mb-0.5">Menunggu Review</p><p class="text-3xl font-bold text-gray-900"><?= $statPending ?></p></div>
+                    <div><p class="text-[12px] text-gray-500 mb-0.5">Pending</p><p class="text-3xl font-bold text-gray-900"><?= $statPending ?></p></div>
                 </div>
                 <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center gap-4">
                     <div class="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center shrink-0"><i class="fas fa-check-circle text-green-500 text-[20px]"></i></div>
@@ -209,7 +225,7 @@ $userName = $_SESSION['nama'] ?? 'Pembimbing';
                                 $statusLabel = match($j['status']) {
                                     'approved' => 'Disetujui',
                                     'rejected' => 'Ditolak',
-                                    default => 'Menunggu',
+                                    default => 'Pending',
                                 };
                             ?>
                             <tr class="journal-row transition-colors">
@@ -303,7 +319,7 @@ $userName = $_SESSION['nama'] ?? 'Pembimbing';
         document.getElementById('d-hasil').textContent = j.hasil || '-';
         document.getElementById('d-id').value = j.id;
 
-        const statusMap = { approved: ['Disetujui','bg-green-100 text-green-700'], rejected: ['Ditolak','bg-red-100 text-red-600'], pending: ['Menunggu','bg-orange-100 text-orange-600'] };
+        const statusMap = { approved: ['Disetujui','bg-green-100 text-green-700'], rejected: ['Ditolak','bg-red-100 text-red-600'], pending: ['Pending','bg-orange-100 text-orange-600'] };
         const [label, cls] = statusMap[j.status] || statusMap.pending;
         document.getElementById('d-status').innerHTML = `<span class="px-3 py-1 rounded-full text-[12px] font-semibold ${cls}">${label}</span>`;
 
