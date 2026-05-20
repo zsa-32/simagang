@@ -28,7 +28,7 @@
         SELECT id, tanggal, kegiatan, hasil, dokumentasi, status
         FROM logbooks
         WHERE mahasiswa_id = :mid
-        ORDER BY tanggal DESC
+        ORDER BY tanggal DESC, id DESC
         LIMIT :lmt OFFSET :ofs
     ");
     $stmt->bindValue('mid', $mhsId, PDO::PARAM_INT);

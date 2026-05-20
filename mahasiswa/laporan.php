@@ -125,7 +125,7 @@
                 <!-- Upload Section -->
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
                     <h3 class="text-[17px] font-bold text-gray-800 mb-5">Upload Laporan Akhir</h3>
-                    <form method="POST" enctype="multipart/form-data">
+                    <form method="POST" enctype="multipart/form-data" id="formLaporan">
                         <div id="dropzone"
                              class="dropzone border-2 border-dashed border-gray-300 rounded-xl p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-blue-50/40 hover:border-blue-400 transition-all"
                              onclick="document.getElementById('fileInput').click()"
@@ -241,11 +241,48 @@
         function handleDrop(e) { e.preventDefault(); handleDragLeave(e); if (e.dataTransfer.files.length > 0) showFile(e.dataTransfer.files[0]); }
         function handleFileSelect(e) { if (e.target.files.length > 0) showFile(e.target.files[0]); }
         function showFile(file) {
+            if (file.size > 10 * 1024 * 1024) { showAlert('Ukuran file melebihi 10MB.', 'red'); clearFile(); return; }
+            const allowed = ['pdf', 'doc', 'docx'];
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (!allowed.includes(ext)) { showAlert('Format file tidak didukung. Gunakan PDF, DOC, atau DOCX.', 'red'); clearFile(); return; }
             document.getElementById('fileName').textContent = file.name;
             document.getElementById('fileSize').textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
             document.getElementById('fileSelected').classList.remove('hidden');
         }
         function clearFile() { document.getElementById('fileInput').value = ''; document.getElementById('fileSelected').classList.add('hidden'); }
+
+        // Form validation — custom styled alert
+        document.getElementById('formLaporan').addEventListener('submit', function(e) {
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                e.preventDefault();
+                showAlert('File laporan wajib diunggah.', 'red');
+                const dropzone = document.getElementById('dropzone');
+                dropzone.classList.add('border-red-400', 'bg-red-50/30');
+                setTimeout(() => dropzone.classList.remove('border-red-400', 'bg-red-50/30'), 3000);
+                return;
+            }
+        });
+
+        function showAlert(msg, type) {
+            const existing = document.getElementById('alertMsg');
+            if (existing) existing.remove();
+
+            const icon = type === 'green' ? 'check-circle' : 'exclamation-circle';
+            const alertDiv = document.createElement('div');
+            alertDiv.id = 'alertMsg';
+            alertDiv.className = `bg-${type}-50 border border-${type}-200 text-${type}-700 px-4 py-3 rounded-xl text-[14px] flex items-center gap-2 transition-opacity duration-300`;
+            alertDiv.innerHTML = `<i class="fas fa-${icon}"></i> ${msg}`;
+
+            const container = document.querySelector('.max-w-\\[1100px\\]');
+            container.insertBefore(alertDiv, container.firstChild);
+            alertDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            setTimeout(() => {
+                alertDiv.style.opacity = '0';
+                setTimeout(() => alertDiv.remove(), 300);
+            }, 3000);
+        }
     </script>
 </body>
 </html>

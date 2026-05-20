@@ -12,13 +12,25 @@
     $mhsId = $mhs ? $mhs['id'] : 0;
 
     $error = '';
+    $todayDate = date('Y-m-d');
+
+    // Check if already submitted today (status != rejected)
+    $chkToday = $conn->prepare("
+        SELECT id FROM logbooks
+        WHERE mahasiswa_id = :mid AND tanggal = :tgl AND status != 'rejected'
+    ");
+    $chkToday->execute(['mid' => $mhsId, 'tgl' => $todayDate]);
+    $alreadySubmitted = $chkToday->fetch() ? true : false;
+
     // Handle form submission
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tanggal = $_POST['tanggal'] ?? '';
         $kegiatan = trim($_POST['judul'] ?? '');
         $deskripsi = trim($_POST['deskripsi'] ?? '');
 
-        if (!$tanggal || !$kegiatan || !$deskripsi) {
+        if ($alreadySubmitted) {
+            $error = 'Anda sudah mengisi jurnal untuk hari ini. Anda dapat mengisi kembali jika jurnal ditolak.';
+        } elseif (!$tanggal || !$kegiatan || !$deskripsi) {
             $error = 'Semua field wajib harus diisi.';
         } else {
             // Handle file upload
@@ -102,6 +114,20 @@
                         <p class="text-[14px] text-gray-400 mt-1">Isi detail kegiatan magang Anda hari ini.</p>
                     </div>
 
+                    <?php if ($alreadySubmitted): ?>
+                    <!-- Already submitted notice -->
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
+                        <div class="w-14 h-14 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-check-circle text-yellow-500 text-[24px]"></i>
+                        </div>
+                        <h4 class="text-[16px] font-bold text-gray-800 mb-2">Jurnal Hari Ini Sudah Diisi</h4>
+                        <p class="text-[14px] text-gray-500 mb-5">Anda sudah mengisi jurnal untuk hari ini. Anda dapat mengisi kembali jika jurnal sebelumnya ditolak.</p>
+                        <a href="jurnal.php" class="inline-flex items-center gap-2 px-6 py-2.5 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-xl font-medium text-[14px] transition-colors shadow-sm">
+                            <i class="fas fa-arrow-left text-[13px]"></i> Kembali ke Jurnal
+                        </a>
+                    </div>
+                    <?php else: ?>
+
                     <form action="" method="POST" enctype="multipart/form-data" id="formJurnal">
 
                         <!-- Tanggal Kegiatan -->
@@ -113,8 +139,8 @@
                                 <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
                                     <i class="fas fa-calendar-alt text-gray-400 text-[14px]"></i>
                                 </div>
-                                <input type="date" id="tanggal" name="tanggal" required
-                                       class="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl text-[14px] text-gray-700 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all placeholder-gray-400">
+                                <input type="date" id="tanggal" name="tanggal" readonly
+                                       class="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl text-[14px] text-gray-700 bg-gray-100 cursor-not-allowed focus:outline-none transition-all placeholder-gray-400">
                             </div>
                         </div>
 
@@ -123,7 +149,7 @@
                             <label for="judul" class="block text-[14px] font-semibold text-gray-700 mb-2">
                                 Judul Kegiatan <span class="text-red-500">*</span>
                             </label>
-                            <input type="text" id="judul" name="judul" required
+                            <input type="text" id="judul" name="judul"
                                    placeholder="Misal: Training Dasar IT"
                                    class="w-full px-4 py-3 border border-gray-200 rounded-xl text-[14px] text-gray-700 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all placeholder-gray-400">
                         </div>
@@ -165,7 +191,7 @@
                             <label for="deskripsi" class="block text-[14px] font-semibold text-gray-700 mb-2">
                                 Deskripsi Kegiatan <span class="text-red-500">*</span>
                             </label>
-                            <textarea id="deskripsi" name="deskripsi" required rows="5"
+                            <textarea id="deskripsi" name="deskripsi" rows="5"
                                       placeholder="Tuliskan rincian kegiatan atau observasi Anda..."
                                       class="w-full px-4 py-3 border border-gray-200 rounded-xl text-[14px] text-gray-700 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all placeholder-gray-400 resize-none leading-relaxed"></textarea>
                             <p class="text-[12px] text-gray-400 mt-1.5 text-right"><span id="charCount">0</span> karakter</p>
@@ -180,6 +206,7 @@
                         </div>
 
                     </form>
+                    <?php endif; ?>
                 </div>
 
             </div>
@@ -187,14 +214,14 @@
 
         <?php include '../includes/footer.php'; ?>
     </div>
-
+    <?php if (!$alreadySubmitted): ?>
     <script>
         function onDragOver(e) { e.preventDefault(); document.getElementById('dropzone').classList.add('drag-over', 'border-blue-400', 'bg-blue-50'); }
         function onDragLeave(e) { document.getElementById('dropzone').classList.remove('drag-over', 'border-blue-400', 'bg-blue-50'); }
         function onDrop(e) { e.preventDefault(); onDragLeave(e); const file = e.dataTransfer.files[0]; if (file) showPreview(file); }
         function onFileSelect(e) { const file = e.target.files[0]; if (file) showPreview(file); }
         function showPreview(file) {
-            if (file.size > 2 * 1024 * 1024) { alert('Ukuran file melebihi 2MB.'); clearFile(); return; }
+            if (file.size > 2 * 1024 * 1024) { showAlert('Ukuran file melebihi 2MB.', 'red'); clearFile(); return; }
             document.getElementById('previewName').textContent = file.name;
             document.getElementById('previewSize').textContent = (file.size / 1024).toFixed(1) + ' KB';
             document.getElementById('filePreview').classList.remove('hidden');
@@ -205,6 +232,50 @@
         function clearFile() { document.getElementById('buktFile').value = ''; document.getElementById('filePreview').classList.add('hidden'); document.getElementById('previewImg').src = '#'; document.getElementById('previewImg').classList.add('hidden'); document.getElementById('previewIcon').classList.remove('hidden'); }
         document.getElementById('deskripsi').addEventListener('input', function() { document.getElementById('charCount').textContent = this.value.length; });
         document.getElementById('tanggal').value = new Date().toISOString().split('T')[0];
+
+        // Form validation — all required fields use custom styled alert
+        document.getElementById('formJurnal').addEventListener('submit', function(e) {
+            const tanggal = document.getElementById('tanggal').value;
+            const judul = document.getElementById('judul').value.trim();
+            const deskripsi = document.getElementById('deskripsi').value.trim();
+
+            if (!tanggal) {
+                e.preventDefault();
+                showAlert('Tanggal kegiatan wajib diisi.', 'red');
+                return;
+            }
+            if (!judul) {
+                e.preventDefault();
+                showAlert('Judul kegiatan wajib diisi.', 'red');
+                return;
+            }
+            if (!deskripsi) {
+                e.preventDefault();
+                showAlert('Deskripsi kegiatan wajib diisi.', 'red');
+                return;
+            }
+        });
+
+        function showAlert(msg, type) {
+            const existing = document.getElementById('alertMsg');
+            if (existing) existing.remove();
+
+            const icon = type === 'green' ? 'check-circle' : 'exclamation-circle';
+            const alertDiv = document.createElement('div');
+            alertDiv.id = 'alertMsg';
+            alertDiv.className = `bg-${type}-50 border border-${type}-200 text-${type}-700 px-4 py-3 rounded-xl text-[14px] flex items-center gap-2 transition-opacity duration-300`;
+            alertDiv.innerHTML = `<i class="fas fa-${icon}"></i> ${msg}`;
+
+            const container = document.querySelector('.max-w-\\[1200px\\]');
+            container.insertBefore(alertDiv, container.firstChild);
+            alertDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            setTimeout(() => {
+                alertDiv.style.opacity = '0';
+                setTimeout(() => alertDiv.remove(), 300);
+            }, 3000);
+        }
     </script>
+    <?php endif; ?>
 </body>
 </html>
