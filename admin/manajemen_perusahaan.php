@@ -13,26 +13,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     if ($action === 'tambah') {
-        $stmt = $conn->prepare("INSERT INTO companies (nama_perusahaan, alamat_perusahaan, email_business, contact_person, no_hp, bidang_usaha, status_permodalan, latitude, longitude, radius) VALUES (?,?,?,?,?,?,?,?,?,?)");
+        $stmt = $conn->prepare("INSERT INTO companies (nama_perusahaan, alamat_perusahaan, email_business, contact_person, no_hp, bidang_usaha, status_permodalan) VALUES (?,?,?,?,?,?,?)");
         $stmt->execute([
-            trim($_POST['nama_perusahaan']), trim($_POST['alamat_perusahaan']),
-            trim($_POST['email_business']), trim($_POST['contact_person']),
-            trim($_POST['no_hp']), trim($_POST['bidang_usaha']),
-            trim($_POST['status_permodalan']),
-            $_POST['latitude'] ?: null, $_POST['longitude'] ?: null,
-            $_POST['radius'] ?: 200
+            trim($_POST['nama_perusahaan'] ?? ''), trim($_POST['alamat_perusahaan'] ?? ''),
+            trim($_POST['email_business'] ?? ''), trim($_POST['contact_person'] ?? ''),
+            trim($_POST['no_hp'] ?? ''), trim($_POST['bidang_usaha'] ?? ''),
+            trim($_POST['status_permodalan'] ?? '')
         ]);
         $msg = 'Perusahaan berhasil ditambahkan.'; $msgType = 'success';
 
     } elseif ($action === 'edit') {
-        $stmt = $conn->prepare("UPDATE companies SET nama_perusahaan=?, alamat_perusahaan=?, email_business=?, contact_person=?, no_hp=?, bidang_usaha=?, status_permodalan=?, latitude=?, longitude=?, radius=?, updated_at=NOW() WHERE id=?");
+        $stmt = $conn->prepare("UPDATE companies SET nama_perusahaan=?, alamat_perusahaan=?, email_business=?, contact_person=?, no_hp=?, bidang_usaha=?, status_permodalan=?, updated_at=NOW() WHERE id=?");
         $stmt->execute([
-            trim($_POST['nama_perusahaan']), trim($_POST['alamat_perusahaan']),
-            trim($_POST['email_business']), trim($_POST['contact_person']),
-            trim($_POST['no_hp']), trim($_POST['bidang_usaha']),
-            trim($_POST['status_permodalan']),
-            $_POST['latitude'] ?: null, $_POST['longitude'] ?: null,
-            $_POST['radius'] ?: 200, (int)$_POST['id']
+            trim($_POST['nama_perusahaan'] ?? ''), trim($_POST['alamat_perusahaan'] ?? ''),
+            trim($_POST['email_business'] ?? ''), trim($_POST['contact_person'] ?? ''),
+            trim($_POST['no_hp'] ?? ''), trim($_POST['bidang_usaha'] ?? ''),
+            trim($_POST['status_permodalan'] ?? ''),
+            (int)$_POST['id']
         ]);
         $msg = 'Data perusahaan berhasil diperbarui.'; $msgType = 'success';
 
