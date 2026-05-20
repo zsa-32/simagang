@@ -156,7 +156,7 @@
                                 Kategori Izin <span class="text-red-500">*</span>
                             </label>
                             <div class="relative">
-                                <select id="kategori" name="kategori" required
+                                <select id="kategori" name="kategori"
                                         class="w-full appearance-none px-4 py-3 border border-gray-200 rounded-xl text-[14px] bg-gray-50 text-gray-500 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all cursor-pointer">
                                     <option value="" disabled selected>Pilih jenis izin..</option>
                                     <option value="sakit">Sakit</option>
@@ -176,14 +176,14 @@
                                 <label for="dari_tanggal" class="block text-[14px] font-semibold text-gray-700 mb-2">Dari Tanggal <span class="text-red-500">*</span></label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none"><i class="fas fa-calendar-alt text-gray-400 text-[13px]"></i></div>
-                                    <input type="date" id="dari_tanggal" name="dari_tanggal" required class="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl text-[14px] text-gray-700 bg-gray-50 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
+                                    <input type="date" id="dari_tanggal" name="dari_tanggal" class="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl text-[14px] text-gray-700 bg-gray-50 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
                                 </div>
                             </div>
                             <div>
                                 <label for="sampai_tanggal" class="block text-[14px] font-semibold text-gray-700 mb-2">Sampai Tanggal <span class="text-red-500">*</span></label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none"><i class="fas fa-calendar-alt text-gray-400 text-[13px]"></i></div>
-                                    <input type="date" id="sampai_tanggal" name="sampai_tanggal" required class="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl text-[14px] text-gray-700 bg-gray-50 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
+                                    <input type="date" id="sampai_tanggal" name="sampai_tanggal" class="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl text-[14px] text-gray-700 bg-gray-50 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all">
                                 </div>
                             </div>
                         </div>
@@ -191,7 +191,7 @@
                         <!-- Alasan -->
                         <div class="mb-5">
                             <label for="alasan" class="block text-[14px] font-semibold text-gray-700 mb-2">Alasan Detail <span class="text-red-500">*</span></label>
-                            <textarea id="alasan" name="alasan" required rows="4"
+                            <textarea id="alasan" name="alasan" rows="4"
                                       placeholder="Jelaskan alasan izin Anda secara detail"
                                       class="w-full px-4 py-3 border border-gray-200 rounded-xl text-[14px] text-gray-700 bg-gray-50 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all placeholder-gray-400 resize-none leading-relaxed"></textarea>
                         </div>
@@ -209,7 +209,7 @@
                                 <p class="text-[14px] text-gray-600 font-medium mb-0.5">Unggah Bukti (Surat Sakit / Bukti Chat Dosen)</p>
                                 <p class="text-[12px] text-gray-400 mb-4">(Maks. 2MB)</p>
                                 <button type="button" class="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-[13px] font-medium px-5 py-2 rounded-lg transition-colors shadow-sm">Pilih File</button>
-                                <input type="file" id="buktInput" name="bukti" required class="hidden" accept="image/jpeg,image/png,image/jpg,application/pdf" onchange="onFileSelect(event)">
+                                <input type="file" id="buktInput" name="bukti" class="hidden" accept="image/jpeg,image/png,image/jpg,application/pdf" onchange="onFileSelect(event)">
                             </div>
                             <div id="filePreview" class="hidden mt-3 p-3 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-between gap-3">
                                 <div class="flex items-center gap-3">
@@ -310,12 +310,72 @@
             document.getElementById('sampai_tanggal').min = this.value;
             if (document.getElementById('sampai_tanggal').value < this.value) document.getElementById('sampai_tanggal').value = this.value;
         });
+
+        // Form validation — all required fields use custom styled alert
+        document.getElementById('formIzin').addEventListener('submit', function(e) {
+            const kategori = document.getElementById('kategori').value;
+            const dari = document.getElementById('dari_tanggal').value;
+            const sampai = document.getElementById('sampai_tanggal').value;
+            const alasan = document.getElementById('alasan').value.trim();
+            const buktiInput = document.getElementById('buktInput');
+
+            if (!kategori) {
+                e.preventDefault();
+                showAlert('Kategori izin wajib dipilih.', 'red');
+                return;
+            }
+            if (!dari) {
+                e.preventDefault();
+                showAlert('Tanggal mulai wajib diisi.', 'red');
+                return;
+            }
+            if (!sampai) {
+                e.preventDefault();
+                showAlert('Tanggal selesai wajib diisi.', 'red');
+                return;
+            }
+            if (!alasan) {
+                e.preventDefault();
+                showAlert('Alasan detail wajib diisi.', 'red');
+                return;
+            }
+            if (!buktiInput.files || buktiInput.files.length === 0) {
+                e.preventDefault();
+                showAlert('Bukti pendukung wajib diunggah.', 'red');
+                const dropzone = document.getElementById('dropzone');
+                dropzone.classList.add('border-red-400', 'bg-red-50/30');
+                setTimeout(() => dropzone.classList.remove('border-red-400', 'bg-red-50/30'), 3000);
+                return;
+            }
+        });
+
+        function showAlert(msg, type) {
+            // Remove existing alert if any
+            const existing = document.getElementById('alertMsg');
+            if (existing) existing.remove();
+
+            const icon = type === 'green' ? 'check-circle' : 'exclamation-circle';
+            const alertDiv = document.createElement('div');
+            alertDiv.id = 'alertMsg';
+            alertDiv.className = `bg-${type}-50 border border-${type}-200 text-${type}-700 px-4 py-3 rounded-xl text-[14px] flex items-center gap-2 transition-opacity duration-300`;
+            alertDiv.innerHTML = `<i class="fas fa-${icon}"></i> ${msg}`;
+
+            const container = document.querySelector('.max-w-\\[860px\\]');
+            container.insertBefore(alertDiv, container.firstChild);
+            alertDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            setTimeout(() => {
+                alertDiv.style.opacity = '0';
+                setTimeout(() => alertDiv.remove(), 300);
+            }, 3000);
+        }
+
         function onDragOver(e) { e.preventDefault(); document.getElementById('dropzone').classList.add('drag-over', 'border-blue-400', 'bg-blue-50'); }
         function onDragLeave(e) { document.getElementById('dropzone').classList.remove('drag-over', 'border-blue-400', 'bg-blue-50'); }
         function onDrop(e) { e.preventDefault(); onDragLeave(e); if (e.dataTransfer.files[0]) showPreview(e.dataTransfer.files[0]); }
         function onFileSelect(e) { if (e.target.files[0]) showPreview(e.target.files[0]); }
         function showPreview(file) {
-            if (file.size > 2 * 1024 * 1024) { alert('Ukuran file melebihi 2MB.'); clearFile(); return; }
+            if (file.size > 2 * 1024 * 1024) { showAlert('Ukuran file melebihi 2MB.', 'red'); clearFile(); return; }
             document.getElementById('fileName').textContent = file.name;
             document.getElementById('fileSize').textContent = (file.size / 1024).toFixed(1) + ' KB';
             const icon = document.getElementById('fileIcon');

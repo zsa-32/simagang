@@ -8,7 +8,7 @@ $host = "localhost";
 $port = "3306";
 $db   = "simagang";
 $user = "root";
-$pass = "";
+$pass = "root";
 
 try {
     // Membuat koneksi dengan PDO
