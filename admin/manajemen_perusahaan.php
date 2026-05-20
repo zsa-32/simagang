@@ -229,9 +229,6 @@ function openEdit(data) {
     document.querySelector('#formEdit [name="no_hp"]').value = data.no_hp || '';
     document.querySelector('#formEdit [name="bidang_usaha"]').value = data.bidang_usaha || '';
     document.querySelector('#formEdit [name="status_permodalan"]').value = data.status_permodalan || '';
-    document.querySelector('#formEdit [name="latitude"]').value = data.latitude || '';
-    document.querySelector('#formEdit [name="longitude"]').value = data.longitude || '';
-    document.querySelector('#formEdit [name="radius"]').value = data.radius || 200;
     openModal('modalEdit');
 }
 function confirmHapus(id, nama) {
